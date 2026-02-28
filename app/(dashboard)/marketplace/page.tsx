@@ -130,16 +130,16 @@ export default async function MarketplacePage({
                 href={`/marketplace/${plugin.slug}`}
                 className="group rounded-md border border-[#262626] bg-[#0a0a0a] p-5 transition-all hover:border-[#333] hover:bg-[#111111]"
               >
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <Badge variant="outline" className="border-[#333] text-[#a1a1a1]">
+                <div className="mb-3 flex items-center gap-2">
+                  <Badge variant="outline" className="border-[#333] text-[#a1a1a1] max-w-[70%] truncate shrink">
                     {plugin.domain}
                   </Badge>
                   {plugin.isPublished ? (
-                    <Badge className="bg-[#00d4aa]/10 text-[#00d4aa] border-[#00d4aa]/20">
+                    <Badge className="bg-[#00d4aa]/10 text-[#00d4aa] border-[#00d4aa]/20 shrink-0">
                       Published
                     </Badge>
                   ) : (
-                    <Badge className="bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20">
+                    <Badge className="bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20 shrink-0">
                       Draft Share
                     </Badge>
                   )}
