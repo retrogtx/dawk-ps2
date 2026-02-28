@@ -295,7 +295,7 @@ export default function ApiKeysPage() {
               stop working.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-md border border-[#ff4444]/20 bg-[#ff4444]/5 px-3 py-2">
+          <div className="w-fit rounded-md border border-[#ff4444]/20 bg-[#ff4444]/5 px-3 py-2">
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#ff4444]" />
               <p className="text-sm text-[#ff4444]">
