@@ -14,7 +14,13 @@
  */
 
 import { Lexic, LexicAPIError } from "./index";
-import type { QueryResult, QueryRequestOptions } from "./types";
+import type {
+  QueryResult,
+  QueryRequestOptions,
+  CollaborationResult,
+  CollaborationMode,
+  CollaborationStreamEvent,
+} from "./types";
 
 export interface LexicAutoGPTConfig {
   apiKey: string;
@@ -100,10 +106,145 @@ export class LexicAutoGPT {
   }
 }
 
+// ─── Collaboration Adapter ───────────────────────────────────────────
+
+export interface LexicCollaborationAutoGPTConfig {
+  apiKey: string;
+  experts: string[];
+  baseUrl?: string;
+  commandName?: string;
+  commandDescription?: string;
+  mode?: CollaborationMode;
+  maxRounds?: number;
+  onEvent?: (event: CollaborationStreamEvent) => void;
+}
+
 /**
- * Format a QueryResult into human-readable text for AutoGPT consumption.
- * Gracefully handles missing/empty fields.
+ * Wraps Lexic multi-expert collaboration as an AutoGPT command.
+ * Runs adversarial deliberation and returns the consensus in
+ * human-readable text with per-expert breakdowns.
  */
+export class LexicCollaborationAutoGPT {
+  private client: Lexic;
+  private experts: string[];
+  private mode: CollaborationMode;
+  private maxRounds: number;
+  private commandName: string;
+  private commandDescription: string;
+  private onEvent?: (event: CollaborationStreamEvent) => void;
+
+  constructor(config: LexicCollaborationAutoGPTConfig) {
+    this.client = new Lexic({
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl,
+    });
+    this.experts = config.experts;
+    this.mode = config.mode || "debate";
+    this.maxRounds = config.maxRounds || 3;
+    this.onEvent = config.onEvent;
+    this.commandName =
+      config.commandName || "consult_expert_panel";
+    this.commandDescription =
+      config.commandDescription ||
+      `Consult a panel of ${config.experts.length} domain experts (${config.experts.join(", ")}). They debate and synthesize a consensus answer.`;
+  }
+
+  asCommand(): AutoGPTCommand {
+    return {
+      name: this.commandName,
+      description: this.commandDescription,
+      parameters: {
+        query: {
+          type: "string",
+          description: "The cross-domain question to put before the expert panel",
+          required: true,
+        },
+      },
+      execute: async (args: Record<string, string>): Promise<string> => {
+        return this.execute(args.query);
+      },
+    };
+  }
+
+  async execute(query: string): Promise<string> {
+    try {
+      const result = await this.client.collaborateStreamToResult(
+        {
+          experts: this.experts,
+          query,
+          mode: this.mode,
+          maxRounds: this.maxRounds,
+        },
+        this.onEvent,
+      );
+
+      return formatCollaborationForAutoGPT(result);
+    } catch (err) {
+      if (err instanceof LexicAPIError) {
+        return `Lexic Collaboration Error (${err.status}): ${err.message}`;
+      }
+      return `Lexic Collaboration Error: ${(err as Error).message}`;
+    }
+  }
+
+  setExperts(expertSlugs: string[]): void {
+    this.experts = expertSlugs;
+  }
+
+  setMode(mode: CollaborationMode): void {
+    this.mode = mode;
+  }
+}
+
+function formatCollaborationForAutoGPT(result: CollaborationResult): string {
+  const { consensus, rounds } = result;
+  const lines: string[] = [
+    `Expert Panel Consensus (confidence: ${consensus.confidence}, agreement: ${Math.round(consensus.agreementLevel * 100)}%):`,
+    consensus.answer,
+  ];
+
+  const contributions = consensus.expertContributions ?? [];
+  if (contributions.length > 0) {
+    lines.push("", "Expert Contributions:");
+    for (const contrib of contributions) {
+      lines.push(`  [${contrib.expert}] (${contrib.domain}):`);
+      for (const point of contrib.keyPoints) {
+        lines.push(`    • ${point}`);
+      }
+    }
+  }
+
+  const conflicts = consensus.conflicts ?? [];
+  if (conflicts.length > 0) {
+    lines.push("", "Conflicts:");
+    for (const conflict of conflicts) {
+      const status = conflict.resolved ? "RESOLVED" : "UNRESOLVED";
+      lines.push(`  ${status}: ${conflict.topic}`);
+      for (const pos of conflict.positions) {
+        lines.push(`    - ${pos.expert}: ${pos.stance}`);
+      }
+      if (conflict.resolution) {
+        lines.push(`    Resolution: ${conflict.resolution}`);
+      }
+    }
+  }
+
+  const citations = consensus.citations ?? [];
+  if (citations.length > 0) {
+    lines.push("", "Combined Citations:");
+    for (let i = 0; i < citations.length; i++) {
+      const c = citations[i];
+      lines.push(`  [${i + 1}] ${c.document}: ${c.excerpt.slice(0, 100)}...`);
+    }
+  }
+
+  lines.push("", `Deliberation: ${rounds.length} round(s), ${result.latencyMs}ms`);
+
+  return lines.join("\n");
+}
+
+// ─── Single-Expert Formatting ────────────────────────────────────────
+
 function formatResultForAutoGPT(result: QueryResult): string {
   const lines: string[] = [
     `Expert Answer (confidence: ${result.confidence}):`,

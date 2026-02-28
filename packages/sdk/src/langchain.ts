@@ -16,7 +16,13 @@
  */
 
 import { Lexic, LexicAPIError } from "./index";
-import type { QueryResult, QueryRequestOptions } from "./types";
+import type {
+  QueryResult,
+  QueryRequestOptions,
+  CollaborationResult,
+  CollaborationMode,
+  CollaborationStreamEvent,
+} from "./types";
 
 export interface LexicToolConfig {
   apiKey: string;
@@ -92,6 +98,121 @@ export class LexicTool {
  * Includes full citation metadata (document, page, section, excerpt) so the
  * agent can reference sources accurately.
  */
+// ─── Collaboration Tool ──────────────────────────────────────────────
+
+export interface LexicCollaborationToolConfig {
+  apiKey: string;
+  experts: string[];
+  baseUrl?: string;
+  name?: string;
+  description?: string;
+  mode?: CollaborationMode;
+  maxRounds?: number;
+  onEvent?: (event: CollaborationStreamEvent) => void;
+}
+
+/**
+ * A LangChain-compatible tool for multi-expert collaboration rooms.
+ * Sends a query to multiple SME plugins, runs adversarial deliberation,
+ * and returns the synthesized consensus with per-expert contributions.
+ */
+export class LexicCollaborationTool {
+  name: string;
+  description: string;
+
+  private client: Lexic;
+  private experts: string[];
+  private mode: CollaborationMode;
+  private maxRounds: number;
+  private onEvent?: (event: CollaborationStreamEvent) => void;
+
+  constructor(config: LexicCollaborationToolConfig) {
+    this.client = new Lexic({
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl,
+    });
+    this.experts = config.experts;
+    this.mode = config.mode || "debate";
+    this.maxRounds = config.maxRounds || 3;
+    this.onEvent = config.onEvent;
+    this.name = config.name || "lexic_collaboration";
+    this.description =
+      config.description ||
+      `Consult a panel of ${config.experts.length} domain experts who debate and synthesize a consensus answer. Experts: ${config.experts.join(", ")}`;
+  }
+
+  async call(input: string): Promise<string> {
+    return this._call(input);
+  }
+
+  async _call(input: string): Promise<string> {
+    try {
+      const result = await this.client.collaborateStreamToResult(
+        {
+          experts: this.experts,
+          query: input,
+          mode: this.mode,
+          maxRounds: this.maxRounds,
+        },
+        this.onEvent,
+      );
+
+      return formatCollaborationForAgent(result);
+    } catch (err) {
+      if (err instanceof LexicAPIError) {
+        return JSON.stringify({ error: err.message, status: err.status });
+      }
+      return JSON.stringify({ error: (err as Error).message });
+    }
+  }
+
+  setExperts(expertSlugs: string[]): void {
+    this.experts = expertSlugs;
+  }
+
+  setMode(mode: CollaborationMode): void {
+    this.mode = mode;
+  }
+}
+
+function formatCollaborationForAgent(result: CollaborationResult): string {
+  const { consensus, rounds } = result;
+
+  const conflicts = (consensus.conflicts ?? []).map((c) => ({
+    topic: c.topic,
+    resolved: c.resolved,
+    resolution: c.resolution,
+    positions: c.positions,
+  }));
+
+  const contributions = (consensus.expertContributions ?? []).map((e) => ({
+    expert: e.expert,
+    domain: e.domain,
+    keyPoints: e.keyPoints,
+  }));
+
+  const output: Record<string, unknown> = {
+    consensus: consensus.answer,
+    confidence: consensus.confidence,
+    agreementLevel: consensus.agreementLevel,
+    citations: (consensus.citations ?? []).map((c) => ({
+      id: c.id,
+      document: c.document,
+      excerpt: c.excerpt,
+    })),
+    roundCount: rounds.length,
+    expertContributions: contributions,
+  };
+
+  if (conflicts.length > 0) {
+    output.conflicts = conflicts;
+  }
+
+  return JSON.stringify(output);
+}
+
+// ─── Single-Expert Formatting ────────────────────────────────────────
+
 function formatResultForAgent(result: QueryResult): string {
   const citations = (result.citations ?? []).map((c) => ({
     id: c.id,

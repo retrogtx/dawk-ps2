@@ -325,6 +325,49 @@ export class Lexic {
   }
 
   /**
+   * Convenience wrapper: streams a collaboration and resolves with the
+   * final CollaborationResult. Fires `onEvent` for every SSE event so
+   * callers can render token-by-token progress (expert_thinking,
+   * expert_response, round_complete, etc.).
+   *
+   * Usage:
+   * ```ts
+   * const result = await lexic.collaborateStreamToResult(
+   *   { experts: ["eng", "safety"], query: "..." },
+   *   (event) => {
+   *     if (event.type === "expert_response") console.log(event.expertName, event.answer);
+   *     if (event.type === "round_complete") console.log("Round done");
+   *   },
+   * );
+   * console.log(result.consensus.answer);
+   * ```
+   */
+  async collaborateStreamToResult(
+    options: CollaborateOptions,
+    onEvent?: (event: CollaborationStreamEvent) => void,
+  ): Promise<CollaborationResult> {
+    let finalResult: CollaborationResult | null = null;
+
+    for await (const event of this.collaborateStream(options)) {
+      onEvent?.(event);
+
+      if (event.type === "done") {
+        finalResult = {
+          rounds: event.rounds,
+          consensus: event.consensus,
+          latencyMs: event.latencyMs,
+        };
+      } else if (event.type === "error") {
+        throw new LexicAPIError(event.error, 0);
+      }
+    }
+
+    if (finalResult) return finalResult;
+
+    throw new LexicAPIError("Collaboration stream ended without a result", 0);
+  }
+
+  /**
    * Stream a collaboration session. Yields events as experts respond:
    *   - experts_resolved → which experts joined
    *   - round_start      → deliberation round beginning
