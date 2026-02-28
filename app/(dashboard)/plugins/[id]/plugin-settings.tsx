@@ -50,6 +50,8 @@ export function PluginSettings({
   const [apiKeys, setApiKeys] = useState<ApiKeyInfo[]>([]);
   const [selectedKeyId, setSelectedKeyId] = useState<string>("");
   const [keyRevealed, setKeyRevealed] = useState(false);
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [keyLoading, setKeyLoading] = useState(false);
   const [keyDropdownOpen, setKeyDropdownOpen] = useState(false);
 
   const loadKeys = useCallback(async () => {
@@ -61,7 +63,7 @@ export function PluginSettings({
         setSelectedKeyId(keys[0].id);
       }
     }
-  }, [selectedKeyId]);
+  }, []); 
 
   useEffect(() => {
     loadKeys();
@@ -103,36 +105,50 @@ export function PluginSettings({
     }
   }
 
-  const keyDisplay = selectedKey
-    ? keyRevealed
-      ? `${selectedKey.keyPrefix}${"•".repeat(52)}`
-      : `${selectedKey.keyPrefix.slice(0, 6)}${"•".repeat(20)}`
+  const bearerToken = selectedKey
+    ? keyRevealed && revealedKey
+      ? revealedKey
+      : selectedKey.keyPrefix.slice(0, 7) + "••••"
     : "lx_your_key_here";
 
-  const snippetKey = selectedKey
-    ? `${selectedKey.keyPrefix}...`
-    : "lx_your_key_here";
+  async function toggleReveal() {
+    if (keyRevealed) {
+      setKeyRevealed(false);
+      setRevealedKey(null);
+      return;
+    }
+    if (!selectedKeyId) return;
+    setKeyLoading(true);
+    try {
+      const res = await fetch("/api/api-keys", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedKeyId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRevealedKey(data.key);
+        setKeyRevealed(true);
+      }
+    } finally {
+      setKeyLoading(false);
+    }
+  }
 
-  const apiSnippet = `curl -X POST /api/v1/query \\
-  -H "Authorization: Bearer ${snippetKey}" \\
+  function getApiSnippet() {
+    return `curl -X POST /api/v1/query \\
+  -H "Authorization: Bearer ${bearerToken}" \\
   -H "Content-Type: application/json" \\
   -d '{
     "plugin": "${slug}",
     "query": "Your question here"
   }'`;
-
-  function copySnippet() {
-    navigator.clipboard.writeText(apiSnippet);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
-  function copyKeyPrefix() {
-    if (selectedKey) {
-      navigator.clipboard.writeText(selectedKey.keyPrefix + "...");
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  function copySnippet() {
+    navigator.clipboard.writeText(getApiSnippet());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -233,112 +249,85 @@ export function PluginSettings({
               <Badge className="bg-[#1a1a1a] text-[#666] border-[#262626]">Publish to enable</Badge>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={copySnippet}
-            className="border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white"
-          >
-            {copied ? (
-              <>
-                <Check className="mr-1.5 h-3 w-3 text-[#00d4aa]" />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy className="mr-1.5 h-3 w-3" />
-                Copy
-              </>
-            )}
-          </Button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {/* API Key Selector */}
-          <div className="space-y-2">
-            <Label className="text-[#a1a1a1]">API Key</Label>
-            <div className="flex items-center gap-2">
-              {/* Key dropdown */}
-              <div className="relative flex-1">
-                <button
-                  type="button"
-                  onClick={() => setKeyDropdownOpen(!keyDropdownOpen)}
-                  className="flex w-full items-center justify-between rounded-md border border-[#262626] bg-[#111111] px-3 py-2 text-sm text-white transition-colors hover:border-[#444]"
-                >
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <Key className="h-3.5 w-3.5 shrink-0 text-[#666]" />
-                    {selectedKey ? (
-                      <span className="truncate">
-                        <span className="text-[#a1a1a1]">{selectedKey.name}</span>
-                        <span className="ml-2 text-[#555]">{selectedKey.keyPrefix}...</span>
-                      </span>
-                    ) : (
-                      <span className="text-[#555]">
-                        {apiKeys.length === 0 ? "No API keys — create one in API Keys" : "Select a key"}
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown className={`ml-2 h-3.5 w-3.5 shrink-0 text-[#666] transition-transform ${keyDropdownOpen ? "rotate-180" : ""}`} />
-                </button>
-
-                {keyDropdownOpen && apiKeys.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full rounded-md border border-[#262626] bg-[#111111] py-1 shadow-lg">
-                    {apiKeys.map((k) => (
-                      <button
-                        key={k.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedKeyId(k.id);
-                          setKeyDropdownOpen(false);
-                          setKeyRevealed(false);
-                        }}
-                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[#1a1a1a] ${
-                          k.id === selectedKeyId ? "text-white bg-[#1a1a1a]" : "text-[#a1a1a1]"
-                        }`}
-                      >
-                        <Key className="h-3.5 w-3.5 shrink-0 text-[#666]" />
-                        <span className="truncate">{k.name}</span>
-                        <span className="ml-auto shrink-0 text-xs text-[#555]">{k.keyPrefix}...</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Reveal toggle */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setKeyRevealed(!keyRevealed)}
-                disabled={!selectedKey}
-                className="border-[#262626] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white disabled:opacity-30 h-[38px] w-[38px] p-0"
+          <div className="flex items-center gap-2">
+            {/* Key selector */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setKeyDropdownOpen(!keyDropdownOpen)}
+                className="flex items-center gap-2 rounded-md border border-[#262626] bg-[#111111] px-3 py-1.5 text-xs text-[#a1a1a1] transition-colors hover:border-[#444] hover:text-white"
               >
-                {keyRevealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
+                <Key className="h-3 w-3 text-[#666]" />
+                {selectedKey ? selectedKey.name : "Select key"}
+                <ChevronDown className={`h-3 w-3 text-[#666] transition-transform ${keyDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
 
-              {/* Copy key */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={copyKeyPrefix}
-                disabled={!selectedKey}
-                className="border-[#262626] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white disabled:opacity-30 h-[38px] w-[38px] p-0"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
+              {keyDropdownOpen && apiKeys.length > 0 && (
+                <div className="absolute right-0 z-10 mt-1 min-w-[200px] rounded-md border border-[#262626] bg-[#111111] py-1 shadow-lg">
+                  {apiKeys.map((k) => (
+                    <button
+                      key={k.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedKeyId(k.id);
+                        setKeyDropdownOpen(false);
+                        setKeyRevealed(false);
+                        setRevealedKey(null);
+                      }}
+                      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[#1a1a1a] ${
+                        k.id === selectedKeyId ? "text-white bg-[#1a1a1a]" : "text-[#a1a1a1]"
+                      }`}
+                    >
+                      <Key className="h-3 w-3 shrink-0 text-[#666]" />
+                      <span className="truncate">{k.name}</span>
+                      <span className="ml-auto shrink-0 text-xs text-[#555]">{k.keyPrefix}...</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Revealed key display */}
-            {selectedKey && keyRevealed && (
-              <div className="rounded-md border border-[#262626] bg-[#111111] px-3 py-2">
-                <code className="text-sm text-[#ededed] break-all">{keyDisplay}</code>
-              </div>
-            )}
-          </div>
+            {/* Eye toggle */}
+            <button
+              type="button"
+              onClick={toggleReveal}
+              disabled={!selectedKey || keyLoading}
+              className="rounded-md border border-[#262626] p-1.5 text-[#a1a1a1] transition-colors hover:bg-[#1a1a1a] hover:text-white disabled:opacity-30"
+            >
+              {keyLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : keyRevealed ? (
+                <EyeOff className="h-3.5 w-3.5" />
+              ) : (
+                <Eye className="h-3.5 w-3.5" />
+              )}
+            </button>
 
-          {/* Curl snippet */}
+            {/* Copy curl */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={copySnippet}
+              className="border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white"
+            >
+              {copied ? (
+                <>
+                  <Check className="mr-1.5 h-3 w-3 text-[#00d4aa]" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-1.5 h-3 w-3" />
+                  Copy
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-6">
           <pre className="overflow-x-auto rounded-md border border-[#262626] bg-[#111111] p-4 text-sm text-[#ededed]">
-            {apiSnippet}
+            {getApiSnippet()}
           </pre>
         </div>
       </div>

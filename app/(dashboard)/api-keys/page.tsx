@@ -196,7 +196,7 @@ export default function ApiKeysPage() {
         </div>
         <div className="p-6">
           <pre className="overflow-x-auto rounded-lg border border-[#262626] bg-[#111111] p-4 text-sm text-[#ededed]">
-{`curl -X POST ${typeof window !== "undefined" ? window.location.origin : "https://your-domain.com"}/api/v1/query \\
+{`curl -X POST /api/v1/query \\
   -H "Authorization: Bearer lx_your_key_here" \\
   -H "Content-Type: application/json" \\
   -d '{

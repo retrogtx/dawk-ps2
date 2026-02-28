@@ -127,6 +127,7 @@ export const apiKeys = pgTable("api_keys", {
   userId: uuid("user_id").references(() => users.id).notNull(),
   keyHash: text("key_hash").notNull(),
   keyPrefix: text("key_prefix").notNull(),
+  keyEncrypted: text("key_encrypted"),
   name: text("name").notNull(),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
