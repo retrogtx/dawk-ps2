@@ -8,8 +8,10 @@ function parsePositiveInt(value: string | undefined): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+// Optional: set DB_POOL_MAX to tune postgres-js connection concurrency per app instance.
+// Example: DB_POOL_MAX=1 (lowest pressure), DB_POOL_MAX=3 (balanced default).
 const configuredMax = parsePositiveInt(process.env.DB_POOL_MAX);
-const defaultMax = process.env.NODE_ENV === "production" ? 1 : 3;
+const defaultMax = 3;
 
 const queryClient = postgres(process.env.DATABASE_URL!, {
   max: configuredMax ?? defaultMax,
