@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -201,8 +202,19 @@ export default function ApiKeysPage() {
       )}
 
       {initialLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#333] border-t-white" />
+        <div className="space-y-2 py-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between rounded-md border border-[#262626] bg-[#0a0a0a] p-4"
+            >
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-4 w-52" />
+              </div>
+              <Skeleton className="h-8 w-8" />
+            </div>
+          ))}
         </div>
       ) : keys.length === 0 && !creating ? (
         <div className="flex flex-col items-center rounded-md border border-dashed border-[#333] py-16">

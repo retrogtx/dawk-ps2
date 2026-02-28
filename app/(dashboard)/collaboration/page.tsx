@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Users, Trash2, MessageSquare, Search } from "lucide-react";
 
 interface Room {
@@ -81,7 +82,26 @@ export default function CollaborationRoomsPage() {
       )}
 
       {loading ? (
-        <div className="py-20 text-center text-[#666]">Loading...</div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-[#262626] bg-[#111] p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-5 w-16" />
+              </div>
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-5 w-16" />
+              </div>
+              <div className="flex gap-3">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center py-20 text-center">
           <Users className="mb-4 h-12 w-12 text-[#333]" />

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Plus, GitBranch, Loader2, Trash2, Pencil } from "lucide-react";
 
 interface Tree {
@@ -22,14 +23,19 @@ export default function DecisionTreesPage() {
   const router = useRouter();
   const pluginId = params.id as string;
   const [trees, setTrees] = useState<Tree[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const loadTrees = useCallback(async () => {
-    const res = await fetch(`/api/plugins/${pluginId}/trees`);
-    if (res.ok) setTrees(await res.json());
+    try {
+      const res = await fetch(`/api/plugins/${pluginId}/trees`);
+      if (res.ok) setTrees(await res.json());
+    } finally {
+      setInitialLoading(false);
+    }
   }, [pluginId]);
 
   useEffect(() => {
@@ -168,7 +174,22 @@ export default function DecisionTreesPage() {
         </div>
       )}
 
-      {trees.length === 0 && !creating ? (
+      {initialLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between rounded-md border border-[#262626] bg-[#0a0a0a] p-4"
+            >
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-4 w-56" />
+              </div>
+              <Skeleton className="h-6 w-16" />
+            </div>
+          ))}
+        </div>
+      ) : trees.length === 0 && !creating ? (
         <div className="flex flex-col items-center rounded-md border border-dashed border-[#333] py-16">
           <GitBranch className="mb-3 h-10 w-10 text-[#333]" />
           <p className="mb-4 text-sm text-[#a1a1a1]">
