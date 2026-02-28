@@ -130,6 +130,7 @@ Lexic is a **web platform + API**. It is NOT a CLI tool, not a library you impor
 - [x] Plugin publish flow (`/plugins/[id]` → publish button)
 - [x] API key management page (`/api-keys`) — create, list, revoke keys
 - [x] Landing page (`/`) — value prop, CTAs, use case examples
+- [x] Documentation page (`/docs`) — full API reference, SDK guide, framework adapters
 
 ### Phase 4: SDK & Integration
 - [x] Create `packages/sdk/` package structure

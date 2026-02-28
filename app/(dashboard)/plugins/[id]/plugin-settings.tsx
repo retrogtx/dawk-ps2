@@ -136,7 +136,8 @@ export function PluginSettings({
   }
 
   function getApiSnippet() {
-    return `curl -X POST /api/v1/query \\
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    return `curl -X POST ${baseUrl}/api/v1/query \\
   -H "Authorization: Bearer ${bearerToken}" \\
   -H "Content-Type: application/json" \\
   -d '{
