@@ -1,16 +1,16 @@
-# PRD: SME-Plug — Hot-Swappable Subject Matter Expert Plugin
+# PRD: Lexic — Hot-Swappable Subject Matter Expert Plugin
 
 ## 1. Vision
 
 **One-liner:** A plug-and-play platform where anyone can create, share, and inject domain-expert "brains" into any AI agent — turning a generalist chatbot into a verified specialist in seconds.
 
-**Why this matters for real people:** Today, if a small manufacturer asks ChatGPT about ASME pressure vessel codes, or a clinic admin asks an AI about HIPAA billing edge-cases, the AI confidently guesses. SME-Plug kills hallucination by hot-swapping in a verified expert module — complete with decision trees, source-of-truth citations, and domain reasoning — so the answer is auditable, correct, and useful.
+**Why this matters for real people:** Today, if a small manufacturer asks ChatGPT about ASME pressure vessel codes, or a clinic admin asks an AI about HIPAA billing edge-cases, the AI confidently guesses. Lexic kills hallucination by hot-swapping in a verified expert module — complete with decision trees, source-of-truth citations, and domain reasoning — so the answer is auditable, correct, and useful.
 
 ---
 
 ## 2. How It Works (Plain English)
 
-SME-Plug is a **web platform + API**. It is NOT a CLI tool, not a library you import — it's a hosted service.
+Lexic is a **web platform + API**. It is NOT a CLI tool, not a library you import — it's a hosted service.
 
 **The core idea:** A "plugin" is a self-contained package of expertise that lives on our servers — the expert's knowledge base (PDFs, docs), decision trees (structured reasoning), and an expert persona prompt, all bundled together. Developers don't "install" a plugin locally. They just reference it by slug in an API call. That's what makes it hot-swappable — it's a parameter, not a dependency.
 
@@ -38,25 +38,25 @@ SME-Plug is a **web platform + API**. It is NOT a CLI tool, not a library you im
 
 ### Primary Users
 
-| Persona | Pain Today | SME-Plug Value |
+| Persona | Pain Today | Lexic Value |
 |---|---|---|
-| **Domain Expert / Consultant** | Knowledge trapped in their head or PDFs; can't scale themselves | Create an SME plugin once → it works 24/7 inside any AI agent, earns royalties |
-| **AI Agent Builder / Developer** | Agents hallucinate on specialized tasks; building domain logic from scratch is expensive | Install a verified SME plugin in 3 lines of code; swap domains without retraining |
+| **Domain Expert / Consultant** | Knowledge trapped in their head or PDFs; can't scale themselves | Create a Lexic plugin once → it works 24/7 inside any AI agent, earns royalties |
+| **AI Agent Builder / Developer** | Agents hallucinate on specialized tasks; building domain logic from scratch is expensive | Install a verified Lexic plugin in 3 lines of code; swap domains without retraining |
 | **End Business User** (factory manager, clinic admin, compliance officer) | Needs expert-grade answers but can't afford a consultant for every question | Ask their AI agent domain questions and get cited, decision-tree-backed answers |
 
 ### Day-to-Day Use Cases
 
-1. **Structural Engineering Firm** — Agent reviews uploaded drawings → SME plugin enforces IS 456 / ACI 318 checks → flags non-compliant beam sizes with citations.
-2. **Healthcare Clinic** — Front-desk AI handles insurance queries → SME plugin injects CPT/ICD coding decision trees → answers with CMS source links.
-3. **E-commerce Seller** — AI agent handles customer returns → SME plugin for "Consumer Protection Act" ensures legally correct responses.
-4. **Legal Freelancer** — Contract review agent → SME plugin for Indian Contract Act → highlights risky clauses with section references.
-5. **Agri-tech Startup** — Farmer chatbot → SME plugin for crop disease diagnosis → follows ICAR decision tree → cites published advisories.
+1. **Structural Engineering Firm** — Agent reviews uploaded drawings → Lexic plugin enforces IS 456 / ACI 318 checks → flags non-compliant beam sizes with citations.
+2. **Healthcare Clinic** — Front-desk AI handles insurance queries → Lexic plugin injects CPT/ICD coding decision trees → answers with CMS source links.
+3. **E-commerce Seller** — AI agent handles customer returns → Lexic plugin for "Consumer Protection Act" ensures legally correct responses.
+4. **Legal Freelancer** — Contract review agent → Lexic plugin for Indian Contract Act → highlights risky clauses with section references.
+5. **Agri-tech Startup** — Farmer chatbot → Lexic plugin for crop disease diagnosis → follows ICAR decision tree → cites published advisories.
 
 ---
 
 ## 4. Product Features (MVP — Hackathon Scope)
 
-### 3.1 SME Plugin Builder (Web App)
+### 3.1 Plugin Builder (Web App)
 
 - **Knowledge Base Upload**: Upload PDFs, markdown, URLs, or structured JSON as the domain's "Source of Truth"
 - **Decision Tree Editor**: Visual node-based editor to create domain reasoning flows (if → then → else chains)
@@ -68,7 +68,7 @@ SME-Plug is a **web platform + API**. It is NOT a CLI tool, not a library you im
 ### 3.2 Plugin Marketplace / Registry
 
 - **Browse & Search**: Filter plugins by domain, rating, framework compatibility
-- **Install via API key or SDK**: `sme.install("structural-engineering-v2")` — 1 line
+- **Install via API key or SDK**: `lexic.install("structural-engineering-v2")` — 1 line
 - **Ratings & Reviews**: Users rate plugin accuracy
 - **Usage Analytics Dashboard**: Plugin creators see install count, query volume, accuracy feedback
 
@@ -76,7 +76,7 @@ SME-Plug is a **web platform + API**. It is NOT a CLI tool, not a library you im
 
 - **Framework Adapters**: Pre-built adapters for LangChain, AutoGPT, CrewAI, OpenAI Assistants API
 - **REST API**: For any custom agent — POST the user query + plugin ID → get expert-augmented response
-- **Hot-Swap at Runtime**: Switch the active SME plugin mid-conversation without restart
+- **Hot-Swap at Runtime**: Switch the active plugin mid-conversation without restart
 - **Multi-Plugin Stacking**: Combine plugins (e.g., "Structural Engineering" + "Indian Building Codes") with conflict resolution
 
 ### 3.4 Citation & Audit Engine
@@ -132,10 +132,10 @@ SME-Plug is a **web platform + API**. It is NOT a CLI tool, not a library you im
 - [x] Landing page (`/`) — value prop, CTAs, use case examples
 
 ### Phase 4: SDK & Integration
-- [ ] Create `packages/sdk/` package structure
-- [ ] `@sme-plug/sdk` core — `SMEPlug` client with `query()` + `setActivePlugin()`
-- [ ] LangChain adapter (`SMEPlugTool`)
-- [ ] AutoGPT adapter
+- [x] Create `packages/sdk/` package structure
+- [x] `lexic-sdk` core — `Lexic` client with `query()` + `setActivePlugin()`
+- [x] LangChain adapter (`LexicTool`)
+- [x] AutoGPT adapter
 - [ ] Create 1 demo plugin: "Structural Engineering - IS 456" with knowledge base + decision tree
 - [ ] End-to-end demo: LangChain agent using the demo plugin
 
@@ -181,14 +181,14 @@ Sign up → Create API key on /api-keys page
 
 **Option B — SDK (convenience wrapper, optional):**
 ```
-npm install @sme-plug/sdk
-→ const sme = new SMEPlug({ apiKey: "sme_xxx" })
-→ sme.query({ plugin: "structural-eng-v1", query: "..." })
+npm install lexic-sdk
+→ const lexic = new Lexic({ apiKey: "lx_xxx" })
+→ lexic.query({ plugin: "structural-eng-v1", query: "..." })
 ```
 
 **Option C — LangChain/AutoGPT tool (agent decides when to consult the expert):**
 ```
-const tool = new SMEPlugTool({ apiKey, plugin: "structural-eng-v1" })
+const tool = new LexicTool({ apiKey, plugin: "structural-eng-v1" })
 → Add to agent's tool list → agent autonomously calls expert when relevant
 ```
 
@@ -196,7 +196,7 @@ const tool = new SMEPlugTool({ apiKey, plugin: "structural-eng-v1" })
 ```
 Opens their company's AI assistant → Asks "What's the minimum cover for a beam
 exposed to weather per IS 456?"
-→ Agent (with SME plugin) retrieves from knowledge base → Follows decision tree
+→ Agent (with Lexic plugin) retrieves from knowledge base → Follows decision tree
 → Returns: "45mm nominal cover (IS 456:2000, Table 16, Clause 26.4.2)"
 → User clicks citation → sees the actual source text
 ```
@@ -217,7 +217,7 @@ exposed to weather per IS 456?"
 
 ## 8. Competitive Positioning
 
-| Existing Approach | Limitation | SME-Plug Advantage |
+| Existing Approach | Limitation | Lexic Advantage |
 |---|---|---|
 | RAG (Retrieval Augmented Generation) | Retrieves text but no structured reasoning | We add decision trees + citation enforcement on top of retrieval |
 | Fine-tuning | Expensive, not hot-swappable, no citations | We're runtime-injectable, version-controlled, source-linked |

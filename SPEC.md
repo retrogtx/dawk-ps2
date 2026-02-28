@@ -1,4 +1,4 @@
-# Technical Specification: SME-Plug
+# Technical Specification: Lexic
 
 ## 1. Tech Stack
 
@@ -16,7 +16,7 @@
 | **Embeddings** | **OpenAI text-embedding-3-small (via `@ai-sdk/openai`)** | 1536-dim vectors, cheap, fast, good quality — called through Vercel AI SDK's `embed()` |
 | **UI Components** | **shadcn/ui + Tailwind CSS** | Beautiful defaults, copy-paste components, rapid UI building |
 | **State Management** | **Zustand** | Lightweight, no boilerplate — for client-side state (decision tree editor, chat) |
-| **SDK Distribution** | **npm package (`@sme-plug/sdk`)** | TypeScript SDK that developers install to integrate plugins into their agents |
+| **SDK Distribution** | **npm package (`lexic-sdk`)** | TypeScript SDK that developers install to integrate plugins into their agents |
 | **Decision Tree Runtime** | **Custom engine (TypeScript)** | Lightweight JSON-based tree executor — no external dependency |
 | **Deployment** | **Vercel** | Zero-config Next.js deployment, edge functions, preview URLs |
 
@@ -26,7 +26,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    SME-PLUG PLATFORM                     │
+│                    LEXIC PLATFORM                     │
 │                                                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
 │  │  Plugin       │  │  Marketplace │  │  Test         │  │
@@ -95,7 +95,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// ─── SME Plugins ────────────────────────────────────────────────────
+// ─── Plugins ────────────────────────────────────────────────────────
 
 export const plugins = pgTable("plugins", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -544,7 +544,7 @@ DELETE /api/plugins/:id/trees/:treeId  — Delete tree
 
 ```
 POST /api/v1/query
-Headers: { "Authorization": "Bearer sme_xxxxx" }
+Headers: { "Authorization": "Bearer lx_xxxxx" }
 Body: {
   "plugin": "structural-engineering-v1",
   "query": "What is the minimum cover for a beam exposed to weather?",
@@ -587,18 +587,18 @@ GET /api/marketplace/:slug/stats        — Usage statistics
 
 ---
 
-## 7. SDK Design (`@sme-plug/sdk`)
+## 7. SDK Design (`lexic-sdk`)
 
 ```typescript
-import { SMEPlug } from "@sme-plug/sdk";
+import { Lexic } from "lexic-sdk";
 
 // Initialize
-const sme = new SMEPlug({
-  apiKey: "sme_xxxxx",
+const lexic = new Lexic({
+  apiKey: "lx_xxxxx",
 });
 
 // Query a plugin
-const result = await sme.query({
+const result = await lexic.query({
   plugin: "structural-engineering-v1",
   query: "What is the minimum cover for an RCC column?",
 });
@@ -608,13 +608,13 @@ console.log(result.citations);    // source references
 console.log(result.decisionPath); // reasoning trace
 
 // Hot-swap plugin at runtime
-sme.setActivePlugin("hvac-design-v1");
+lexic.setActivePlugin("hvac-design-v1");
 
 // LangChain integration
-import { SMEPlugTool } from "@sme-plug/sdk/langchain";
+import { LexicTool } from "lexic-sdk/langchain";
 
-const tool = new SMEPlugTool({
-  apiKey: "sme_xxxxx",
+const tool = new LexicTool({
+  apiKey: "lx_xxxxx",
   plugin: "structural-engineering-v1",
   name: "structural_expert",
   description: "Consult a structural engineering expert with cited sources",
@@ -706,7 +706,7 @@ hackx/
 │   └── store/
 │       └── tree-editor-store.ts      # Zustand store for decision tree editor
 ├── packages/
-│   └── sdk/                          # @sme-plug/sdk (npm package)
+│   └── sdk/                          # lexic-sdk (npm package)
 │       ├── src/
 │       │   ├── index.ts              # Core SDK
 │       │   ├── langchain.ts          # LangChain adapter
@@ -766,7 +766,7 @@ CRITICAL RULES:
 
 ```typescript
 // In the SDK — plugins are stateless per-request, so hot-swap is trivial
-class SMEPlug {
+class Lexic {
   private activePlugin: string;
 
   setActivePlugin(pluginSlug: string) {
@@ -815,7 +815,7 @@ class SMEPlug {
 - [ ] Plugin publish flow
 
 ### Phase 4: Integration & Demo (Hours 14-18)
-- [ ] Build `@sme-plug/sdk` with LangChain adapter
+- [ ] Build `lexic-sdk` with LangChain adapter
 - [ ] Create demo plugin: "Structural Engineering - IS 456"
 - [ ] Upload IS 456 relevant sections as knowledge base
 - [ ] Build decision tree for beam/column design checks

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**SME-Plug** — a hot-swappable Subject Matter Expert plugin platform for AI agents. Domain experts create plugins (knowledge base + decision trees + expert persona), developers install them into any AI agent via SDK/API, and end users get cited, hallucination-guarded answers.
+**Lexic** — a hot-swappable Subject Matter Expert plugin platform for AI agents. Domain experts create plugins (knowledge base + decision trees + expert persona), developers install them into any AI agent via SDK/API, and end users get cited, hallucination-guarded answers.
 
 Hackathon project. See `PRD.md` for product requirements and `SPEC.md` for full technical specification.
 
@@ -64,7 +64,7 @@ When an external agent sends a query through a plugin:
 
 Schema defined in `lib/db/schema.ts` (Drizzle). Key tables:
 - `users` — synced from Clerk (stores `clerkId`)
-- `plugins` — SME plugin definitions (system prompt, citation mode, domain)
+- `plugins` — plugin definitions (system prompt, citation mode, domain)
 - `knowledge_documents` → `knowledge_chunks` — uploaded docs chunked with pgvector embeddings
 - `decision_trees` — JSON decision graphs per plugin
 - `api_keys` — hashed keys for external agent access
@@ -79,9 +79,9 @@ DB client lives in `lib/db/index.ts`. pgvector similarity search uses Drizzle's 
 
 ### SDK (`packages/sdk/`)
 
-TypeScript package (`@sme-plug/sdk`) with framework adapters:
-- `index.ts` — core `SMEPlug` client with `query()` and `setActivePlugin()` for hot-swap
-- `langchain.ts` — `SMEPlugTool` adapter for LangChain agents
+TypeScript package (`lexic-sdk`) with framework adapters:
+- `index.ts` — core `Lexic` client with `query()` and `setActivePlugin()` for hot-swap
+- `langchain.ts` — `LexicTool` adapter for LangChain agents
 - `autogpt.ts` — AutoGPT adapter
 
 ## Key Patterns

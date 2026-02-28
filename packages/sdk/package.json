@@ -1,0 +1,49 @@
+{
+  "name": "@lexic-app/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Lexic — hot-swappable subject matter expert plugins for AI agents",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./langchain": {
+      "types": "./dist/langchain.d.ts",
+      "import": "./dist/langchain.js"
+    },
+    "./autogpt": {
+      "types": "./dist/autogpt.d.ts",
+      "import": "./dist/autogpt.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "tsc"
+  },
+  "keywords": [
+    "sme",
+    "ai-agent",
+    "langchain",
+    "autogpt",
+    "rag",
+    "citations",
+    "decision-tree",
+    "expert-system",
+    "hot-swap"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+  }
+}
