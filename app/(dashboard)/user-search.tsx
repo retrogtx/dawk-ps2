@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Search, Users } from "lucide-react";
@@ -85,13 +86,16 @@ export function UserSearch() {
             <ul className="max-h-48 overflow-y-auto py-1">
               {results.map((user) => (
                 <li key={user.id} className="border-b border-[#1f1f1f] last:border-b-0">
-                  <div className="px-3 py-2">
+                  <Link
+                    href={`/users/${encodeURIComponent(user.username)}`}
+                    className="block px-3 py-2 transition-colors hover:bg-[#161616]"
+                  >
                     <p className="truncate text-sm text-white">@{user.username}</p>
                     <p className="truncate text-xs text-[#888]">{user.name}</p>
                     {user.email ? (
                       <p className="truncate text-[11px] text-[#666]">{user.email}</p>
                     ) : null}
-                  </div>
+                  </Link>
                 </li>
               ))}
             </ul>
