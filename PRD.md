@@ -94,42 +94,42 @@ SME-Plug is a **web platform + API**. It is NOT a CLI tool, not a library you im
 - [x] Initialize Next.js + TypeScript + Tailwind
 - [x] Add Clerk dependency
 - [x] Add Drizzle Kit dependency
-- [ ] Install missing packages (drizzle-orm, postgres, ai, @ai-sdk/openai, @supabase/supabase-js, pdf-parse, zustand, zod, svix, shadcn/ui)
+- [x] Install missing packages (drizzle-orm, postgres, ai, @ai-sdk/openai, @supabase/supabase-js, pdf-parse, zustand, zod, svix, shadcn/ui)
 - [ ] Set up Supabase project (Postgres + Storage + pgvector extension)
-- [ ] Add all env vars to `.env` (DATABASE_URL, SUPABASE_*, OPENAI_API_KEY, CLERK_WEBHOOK_SECRET)
-- [ ] Create `drizzle.config.ts`
-- [ ] Create Drizzle schema (`src/lib/db/schema.ts`) — users, plugins, knowledge_documents, knowledge_chunks, decision_trees, api_keys, query_logs
-- [ ] Create Drizzle client (`src/lib/db/index.ts`)
+- [x] Add all env vars to `.env` (DATABASE_URL, SUPABASE_*, OPENAI_API_KEY, CLERK_WEBHOOK_SECRET) (WIP — DATABASE_URL password, OPENAI_API_KEY, CLERK_WEBHOOK_SECRET need values)
+- [x] Create `drizzle.config.ts`
+- [x] Create Drizzle schema (`lib/db/schema.ts`) — users, plugins, knowledge_documents, knowledge_chunks, decision_trees, api_keys, query_logs
+- [x] Create Drizzle client (`lib/db/index.ts`)
 - [ ] Run `drizzle-kit push` to create tables
 - [ ] Run custom migration for pgvector extension + IVFFlat index
-- [ ] Wrap `app/layout.tsx` with `<ClerkProvider>`
-- [ ] Create `middleware.ts` (Clerk authMiddleware protecting dashboard routes)
-- [ ] Create Clerk auth pages (`sign-in/[[...sign-in]]`, `sign-up/[[...sign-up]]`)
-- [ ] Create Clerk webhook endpoint (`/api/webhooks/clerk/route.ts`) for user sync
-- [ ] Create `lib/auth.ts` with `requireUser()` helper
+- [x] Wrap `app/layout.tsx` with `<ClerkProvider>`
+- [x] Create `middleware.ts` (Clerk middleware protecting dashboard routes)
+- [x] Create Clerk auth pages (`sign-in/[[...sign-in]]`, `sign-up/[[...sign-up]]`)
+- [x] Create Clerk webhook endpoint (`/api/webhooks/clerk/route.ts`) for user sync
+- [x] Create `lib/auth.ts` with `requireUser()` helper
 
 ### Phase 2: Core Engine
-- [ ] `lib/engine/embedding.ts` — Vercel AI SDK `embed()` wrapper using `@ai-sdk/openai` text-embedding-3-small
-- [ ] `lib/engine/chunker.ts` — PDF/markdown text → chunks with metadata
+- [x] `lib/engine/embedding.ts` — Vercel AI SDK `embed()` wrapper using `@ai-sdk/openai` text-embedding-3-small
+- [x] `lib/engine/chunker.ts` — PDF/markdown text → chunks with metadata
 - [ ] `lib/utils/pdf-parser.ts` — PDF text extraction via pdf-parse
-- [ ] `lib/engine/retrieval.ts` — pgvector cosine similarity search (top-K, threshold)
-- [ ] `lib/engine/decision-tree.ts` — JSON tree executor (condition/question/action nodes)
-- [ ] `lib/engine/citation.ts` — parse [Source N] refs, map to documents, compute confidence
-- [ ] `lib/engine/hallucination-guard.ts` — refuse when confidence = low
-- [ ] `lib/engine/query-pipeline.ts` — orchestrator (embed → retrieve → tree → LLM → cite → log)
-- [ ] `/api/v1/query/route.ts` — **THE core endpoint** (API key auth, runs pipeline, returns cited response)
-- [ ] `lib/utils/api-key.ts` — key generation + hashing
+- [x] `lib/engine/retrieval.ts` — pgvector cosine similarity search (top-K, threshold)
+- [x] `lib/engine/decision-tree.ts` — JSON tree executor (condition/question/action nodes)
+- [x] `lib/engine/citation.ts` — parse [Source N] refs, map to documents, compute confidence
+- [x] `lib/engine/hallucination-guard.ts` — refuse when confidence = low
+- [x] `lib/engine/query-pipeline.ts` — orchestrator (embed → retrieve → tree → LLM → cite → log)
+- [x] `/api/v1/query/route.ts` — **THE core endpoint** (API key auth, runs pipeline, returns cited response)
+- [x] `lib/utils/api-key.ts` — key generation + hashing
 
 ### Phase 3: Web App UI
-- [ ] Install + configure shadcn/ui components
-- [ ] Plugin list page (`/plugins`)
-- [ ] Plugin creation form (`/plugins/new`) — name, domain, system prompt, citation mode
-- [ ] Knowledge base upload UI (`/plugins/[id]/knowledge`) — drag-and-drop PDFs, trigger chunk+embed
-- [ ] Decision tree editor (`/plugins/[id]/trees`) — JSON editor + visual preview
-- [ ] Test sandbox (`/plugins/[id]/sandbox`) — chat interface hitting query API
-- [ ] Plugin publish flow (`/plugins/[id]` → publish button)
-- [ ] API key management page (`/api-keys`) — create, list, revoke keys
-- [ ] Landing page (`/`) — value prop, CTAs, use case examples
+- [x] Install + configure shadcn/ui components
+- [x] Plugin list page (`/plugins`)
+- [x] Plugin creation form (`/plugins/new`) — name, domain, system prompt, citation mode
+- [x] Knowledge base upload UI (`/plugins/[id]/knowledge`) — text paste + file upload, auto chunk+embed
+- [x] Decision tree editor (`/plugins/[id]/trees`) — JSON editor with example template
+- [x] Test sandbox (`/plugins/[id]/sandbox`) — chat interface with citations + decision path display
+- [x] Plugin publish flow (`/plugins/[id]` → publish button)
+- [x] API key management page (`/api-keys`) — create, list, revoke keys
+- [x] Landing page (`/`) — value prop, CTAs, use case examples
 
 ### Phase 4: SDK & Integration
 - [ ] Create `packages/sdk/` package structure

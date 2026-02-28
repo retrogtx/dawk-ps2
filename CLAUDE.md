@@ -32,7 +32,7 @@ bunx drizzle-kit studio    # Open Drizzle Studio (DB browser)
 ## Tech Stack
 
 - **Next.js 16** (App Router) + React 19 + TypeScript
-- **Clerk** for auth (middleware-protected routes, webhook syncs users to DB)
+- **Clerk** for auth (middleware-protected routes, auto-sync users to DB on first visit)
 - **Drizzle ORM** with `postgres` driver against **Supabase Postgres** (pgvector enabled)
 - **Supabase Storage** for file uploads (PDFs, markdown) — not used for auth or DB queries
 - **Vercel AI SDK** (`ai` + `@ai-sdk/openai`) — GPT-4o for generation, text-embedding-3-small (1536-dim) for embeddings; all LLM/embedding calls go through the AI SDK, never raw OpenAI client
@@ -57,13 +57,12 @@ When an external agent sends a query through a plugin:
 ### Auth Flow
 
 - Clerk handles all sign-in/sign-up UI and session management
-- `middleware.ts` protects `(dashboard)` routes via Clerk's `authMiddleware`
-- Clerk webhook (`/api/webhooks/clerk/route.ts`) syncs user creates/updates/deletes to the `users` table
-- `lib/auth.ts` exports `requireUser()` which resolves Clerk session → DB user record
+- `middleware.ts` protects dashboard routes via Clerk's `clerkMiddleware` + `createRouteMatcher`
+- `lib/auth.ts` exports `requireUser()` which resolves Clerk session → DB user record, auto-creating the user on first visit via `currentUser()`
 
 ### Database
 
-Schema defined in `src/lib/db/schema.ts` (Drizzle). Key tables:
+Schema defined in `lib/db/schema.ts` (Drizzle). Key tables:
 - `users` — synced from Clerk (stores `clerkId`)
 - `plugins` — SME plugin definitions (system prompt, citation mode, domain)
 - `knowledge_documents` → `knowledge_chunks` — uploaded docs chunked with pgvector embeddings
@@ -71,7 +70,7 @@ Schema defined in `src/lib/db/schema.ts` (Drizzle). Key tables:
 - `api_keys` — hashed keys for external agent access
 - `query_logs` — full audit trail with citations and decision paths
 
-DB client lives in `src/lib/db/index.ts`. pgvector similarity search uses Drizzle's `sql` template tag for raw vector ops.
+DB client lives in `lib/db/index.ts`. pgvector similarity search uses Drizzle's `sql` template tag for raw vector ops.
 
 ### Two Auth Modes
 
@@ -95,8 +94,8 @@ TypeScript package (`@sme-plug/sdk`) with framework adapters:
 
 ## Environment Variables
 
-Required in `.env.local`:
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`
+Required in `.env`:
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
 - `DATABASE_URL` (Supabase Postgres connection string for Drizzle)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (storage only)
 - `OPENAI_API_KEY`
