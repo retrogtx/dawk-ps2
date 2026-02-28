@@ -1,34 +1,41 @@
 import { UserButton } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
-import { Blocks, Key, LayoutDashboard, FlaskConical } from "lucide-react";
+import { Blocks, Key, FlaskConical } from "lucide-react";
 
 const navItems = [
   { href: "/plugins", label: "Plugins", icon: Blocks },
   { href: "/api-keys", label: "API Keys", icon: Key },
 ];
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = await currentUser();
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+    user?.emailAddresses[0]?.emailAddress ||
+    "";
+
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-[#0a0a0a]">
       {/* Sidebar */}
-      <aside className="sticky top-0 flex h-screen w-64 flex-col border-r bg-card">
-        <div className="flex h-14 items-center border-b px-6">
-          <Link href="/plugins" className="flex items-center gap-2 font-semibold">
-            <FlaskConical className="h-5 w-5 text-primary" />
-            <span>SME-Plug</span>
+      <aside className="sticky top-0 flex h-screen w-60 flex-col border-r border-[#262626] bg-[#0a0a0a]">
+        <div className="flex h-14 items-center border-b border-[#262626] px-5">
+          <Link href="/plugins" className="flex items-center gap-2 font-bold text-white tracking-tight">
+            <FlaskConical className="h-4 w-4" />
+            <span>Lexic</span>
           </Link>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-0.5 p-3">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-[#a1a1a1] transition-colors hover:bg-[#1a1a1a] hover:text-white"
             >
               <item.icon className="h-4 w-4" />
               {item.label}
@@ -36,19 +43,24 @@ export default function DashboardLayout({
           ))}
         </nav>
 
-        <div className="border-t p-4">
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: { avatarBox: "h-8 w-8" },
-            }}
-          />
+        <div className="border-t border-[#262626] p-4">
+          <div className="flex items-center gap-3">
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{
+                elements: { avatarBox: "h-7 w-7" },
+              }}
+            />
+            {displayName && (
+              <span className="truncate text-sm text-[#a1a1a1]">{displayName}</span>
+            )}
+          </div>
         </div>
       </aside>
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-5xl p-6 md:p-8">{children}</div>
+        <div className="mx-auto max-w-5xl p-6 md:p-10">{children}</div>
       </main>
     </div>
   );

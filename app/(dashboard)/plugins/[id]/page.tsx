@@ -4,11 +4,9 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { plugins, knowledgeDocuments, decisionTrees, queryLogs } from "@/lib/db/schema";
 import { eq, and, count } from "drizzle-orm";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Upload, GitBranch, MessageSquare, Globe } from "lucide-react";
 import { PublishButton } from "./publish-button";
+import { PluginSettings } from "./plugin-settings";
 
 export default async function PluginDetailPage({
   params,
@@ -43,7 +41,7 @@ export default async function PluginDetailPage({
     <div>
       <Link
         href="/plugins"
-        className="mb-4 inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+        className="mb-4 inline-flex items-center text-sm text-[#666] transition-colors hover:text-white"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />
         Back to plugins
@@ -52,112 +50,68 @@ export default async function PluginDetailPage({
       <div className="mb-8 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{plugin.name}</h1>
-            <Badge variant={plugin.isPublished ? "default" : "secondary"}>
-              {plugin.isPublished ? "Published" : "Draft"}
-            </Badge>
+            <h1 className="text-2xl font-bold text-white">{plugin.name}</h1>
+            <PublishButton pluginId={plugin.id} isPublished={plugin.isPublished} />
           </div>
-          <p className="mt-1 font-mono text-sm text-muted-foreground">
-            {plugin.slug}
-          </p>
+          {plugin.slug !== plugin.name && (
+            <p className="mt-1 text-sm text-[#666]">
+              {plugin.slug}
+            </p>
+          )}
           {plugin.description && (
-            <p className="mt-2 text-muted-foreground">{plugin.description}</p>
+            <p className="mt-2 text-[#a1a1a1]">{plugin.description}</p>
           )}
         </div>
-        <PublishButton pluginId={plugin.id} isPublished={plugin.isPublished} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link href={`/plugins/${id}/knowledge`}>
-          <Card className="transition-shadow hover:shadow-md">
-            <CardHeader className="pb-2">
-              <Upload className="h-8 w-8 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <CardTitle className="text-base">Knowledge Base</CardTitle>
-              <CardDescription>
-                {docCount.count} document{docCount.count !== 1 ? "s" : ""} uploaded
-              </CardDescription>
-            </CardContent>
-          </Card>
+          <div className="group rounded-md border border-[#262626] bg-[#0a0a0a] p-5 transition-all hover:border-[#333] hover:bg-[#111111]">
+            <Upload className="mb-3 h-8 w-8 text-[#3b82f6]" />
+            <h3 className="font-bold text-white">Knowledge Base</h3>
+            <p className="mt-1 text-sm text-[#a1a1a1]">
+              {docCount.count} document{docCount.count !== 1 ? "s" : ""} uploaded
+            </p>
+          </div>
         </Link>
 
         <Link href={`/plugins/${id}/trees`}>
-          <Card className="transition-shadow hover:shadow-md">
-            <CardHeader className="pb-2">
-              <GitBranch className="h-8 w-8 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <CardTitle className="text-base">Decision Trees</CardTitle>
-              <CardDescription>
-                {treeCount.count} tree{treeCount.count !== 1 ? "s" : ""}
-              </CardDescription>
-            </CardContent>
-          </Card>
+          <div className="group rounded-md border border-[#262626] bg-[#0a0a0a] p-5 transition-all hover:border-[#333] hover:bg-[#111111]">
+            <GitBranch className="mb-3 h-8 w-8 text-[#00d4aa]" />
+            <h3 className="font-bold text-white">Decision Trees</h3>
+            <p className="mt-1 text-sm text-[#a1a1a1]">
+              {treeCount.count} tree{treeCount.count !== 1 ? "s" : ""}
+            </p>
+          </div>
         </Link>
 
         <Link href={`/plugins/${id}/sandbox`}>
-          <Card className="transition-shadow hover:shadow-md">
-            <CardHeader className="pb-2">
-              <MessageSquare className="h-8 w-8 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <CardTitle className="text-base">Test Sandbox</CardTitle>
-              <CardDescription>Chat with your plugin</CardDescription>
-            </CardContent>
-          </Card>
+          <div className="group rounded-md border border-[#262626] bg-[#0a0a0a] p-5 transition-all hover:border-[#333] hover:bg-[#111111]">
+            <MessageSquare className="mb-3 h-8 w-8 text-[#a855f7]" />
+            <h3 className="font-bold text-white">Test Sandbox</h3>
+            <p className="mt-1 text-sm text-[#a1a1a1]">Chat with your plugin</p>
+          </div>
         </Link>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <Globe className="h-8 w-8 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <CardTitle className="text-base">Queries</CardTitle>
-            <CardDescription>
-              {queryCount.count} total quer{queryCount.count !== 1 ? "ies" : "y"}
-            </CardDescription>
-          </CardContent>
-        </Card>
+        <div className="rounded-md border border-[#262626] bg-[#0a0a0a] p-5">
+          <Globe className="mb-3 h-8 w-8 text-[#f59e0b]" />
+          <h3 className="font-bold text-white">Queries</h3>
+          <p className="mt-1 text-sm text-[#a1a1a1]">
+            {queryCount.count} total quer{queryCount.count !== 1 ? "ies" : "y"}
+          </p>
+        </div>
       </div>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Plugin Settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm font-medium">Domain</p>
-            <p className="text-sm text-muted-foreground">{plugin.domain}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium">Citation Mode</p>
-            <Badge variant="outline">{plugin.citationMode}</Badge>
-          </div>
-          <div>
-            <p className="text-sm font-medium">Version</p>
-            <p className="text-sm text-muted-foreground">{plugin.version}</p>
-          </div>
-          <div>
-            <p className="text-sm font-medium">System Prompt</p>
-            <pre className="mt-1 whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">
-              {plugin.systemPrompt}
-            </pre>
-          </div>
-          {plugin.isPublished && (
-            <div>
-              <p className="text-sm font-medium">API Usage</p>
-              <pre className="mt-1 rounded-md bg-muted p-3 text-sm">
-{`POST /api/v1/query
-{
-  "plugin": "${plugin.slug}",
-  "query": "Your question here..."
-}`}
-              </pre>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <PluginSettings
+        pluginId={plugin.id}
+        initialName={plugin.name}
+        initialDescription={plugin.description ?? ""}
+        initialDomain={plugin.domain}
+        initialSystemPrompt={plugin.systemPrompt}
+        initialCitationMode={plugin.citationMode}
+        slug={plugin.slug}
+        isPublished={plugin.isPublished}
+      />
     </div>
   );
 }

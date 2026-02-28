@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -22,10 +21,12 @@ export default function ApiKeysPage() {
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const loadKeys = useCallback(async () => {
     const res = await fetch("/api/api-keys");
     if (res.ok) setKeys(await res.json());
+    setInitialLoading(false);
   }, []);
 
   useEffect(() => {
@@ -87,138 +88,139 @@ export default function ApiKeysPage() {
     <div>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">API Keys</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold text-white">API Keys</h1>
+          <p className="text-[#a1a1a1]">
             Manage keys for external agents to query your plugins
           </p>
         </div>
-        <Button onClick={() => { setCreating(true); setNewKey(null); }}>
+        <Button onClick={() => { setCreating(true); setNewKey(null); }} className="bg-white text-black hover:bg-[#ccc] font-semibold">
           <Plus className="mr-2 h-4 w-4" />
           New Key
         </Button>
       </div>
 
       {newKey && (
-        <Card className="mb-6 border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950">
-          <CardContent className="py-4">
-            <p className="mb-2 text-sm font-medium text-green-800 dark:text-green-200">
-              Your new API key (copy it now — it won&apos;t be shown again):
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 rounded bg-background px-3 py-2 font-mono text-sm">
-                {newKey}
-              </code>
-              <Button size="sm" variant="outline" onClick={copyKey}>
-                {copied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="mb-6 rounded-md border border-[#00d4aa]/30 bg-[#00d4aa]/5 p-4">
+          <p className="mb-2 text-sm font-semibold text-[#00d4aa]">
+            Your new API key (copy it now — it won&apos;t be shown again):
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 rounded-lg border border-[#262626] bg-[#111111] px-3 py-2 text-sm text-white">
+              {newKey}
+            </code>
+            <Button size="sm" variant="outline" onClick={copyKey} className="border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white">
+              {copied ? (
+                <Check className="h-4 w-4 text-[#00d4aa]" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
       )}
 
       {creating && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Create API Key</CardTitle>
-            <CardDescription>
+        <div className="mb-6 rounded-md border border-[#262626] bg-[#0a0a0a]">
+          <div className="border-b border-[#262626] p-6">
+            <h2 className="font-bold text-white">Create API Key</h2>
+            <p className="mt-1 text-sm text-[#a1a1a1]">
               Give your key a descriptive name to remember what it&apos;s used for.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div className="p-6">
             <form onSubmit={handleCreate} className="flex items-end gap-3">
               <div className="flex-1 space-y-2">
-                <Label htmlFor="keyName">Key Name</Label>
+                <Label htmlFor="keyName" className="text-[#ededed]">Key Name</Label>
                 <Input
                   id="keyName"
                   name="name"
                   placeholder="e.g., Production Agent, LangChain Demo"
                   required
+                  className="border-[#262626] bg-[#111111] text-white placeholder:text-[#555] focus:border-[#444] focus:ring-0"
                 />
               </div>
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="bg-white text-black hover:bg-[#ccc] font-semibold">
                 {loading ? "Creating..." : "Create"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setCreating(false)}
+                className="border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white"
               >
                 Cancel
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {keys.length === 0 && !creating ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center py-12">
-            <Key className="mb-3 h-10 w-10 text-muted-foreground/50" />
-            <p className="mb-4 text-sm text-muted-foreground">
-              No API keys yet. Create one to let external agents query your plugins.
-            </p>
-            <Button onClick={() => setCreating(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create First Key
-            </Button>
-          </CardContent>
-        </Card>
+      {initialLoading ? (
+        <div className="flex justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#333] border-t-white" />
+        </div>
+      ) : keys.length === 0 && !creating ? (
+        <div className="flex flex-col items-center rounded-md border border-dashed border-[#333] py-16">
+          <Key className="mb-3 h-10 w-10 text-[#333]" />
+          <p className="mb-4 text-sm text-[#a1a1a1]">
+            No API keys yet. Create one to let external agents query your plugins.
+          </p>
+          <Button onClick={() => setCreating(true)} className="bg-white text-black hover:bg-[#ccc] font-semibold">
+            <Plus className="mr-2 h-4 w-4" />
+            Create First Key
+          </Button>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {keys.map((k) => (
-            <Card key={k.id}>
-              <CardContent className="flex items-center justify-between py-4">
-                <div className="flex items-center gap-3">
-                  <Key className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">{k.name}</p>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <code>{k.keyPrefix}...</code>
-                      {k.lastUsedAt && (
-                        <span>
-                          Last used{" "}
-                          {new Date(k.lastUsedAt).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
+            <div key={k.id} className="flex items-center justify-between rounded-md border border-[#262626] bg-[#0a0a0a] p-4 transition-colors hover:border-[#333]">
+              <div className="flex items-center gap-3">
+                <Key className="h-5 w-5 text-[#666]" />
+                <div>
+                  <p className="font-semibold text-white">{k.name}</p>
+                  <div className="flex items-center gap-2 text-sm text-[#666]">
+                    <code className="text-[#888]">{k.keyPrefix}...</code>
+                    {k.lastUsedAt && (
+                      <span>
+                        Last used{" "}
+                        {new Date(k.lastUsedAt).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDelete(k.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </CardContent>
-            </Card>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDelete(k.id)}
+                className="text-[#666] hover:text-[#ff4444] hover:bg-[#ff4444]/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           ))}
         </div>
       )}
 
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>Usage Example</CardTitle>
-          <CardDescription>
+      <div className="mt-8 rounded-md border border-[#262626] bg-[#0a0a0a]">
+        <div className="border-b border-[#262626] p-6">
+          <h2 className="font-bold text-white">Usage Example</h2>
+          <p className="mt-1 text-sm text-[#a1a1a1]">
             Use your API key to query any published plugin
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <pre className="overflow-x-auto rounded-lg bg-muted p-4 text-sm">
+          </p>
+        </div>
+        <div className="p-6">
+          <pre className="overflow-x-auto rounded-lg border border-[#262626] bg-[#111111] p-4 text-sm text-[#ededed]">
 {`curl -X POST ${typeof window !== "undefined" ? window.location.origin : "https://your-domain.com"}/api/v1/query \\
-  -H "Authorization: Bearer sme_your_key_here" \\
+  -H "Authorization: Bearer lx_your_key_here" \\
   -H "Content-Type: application/json" \\
   -d '{
     "plugin": "your-plugin-slug",
     "query": "Your question here"
   }'`}
           </pre>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
