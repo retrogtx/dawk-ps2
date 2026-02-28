@@ -35,7 +35,7 @@ bunx drizzle-kit studio    # Open Drizzle Studio (DB browser)
 - **Clerk** for auth (middleware-protected routes, webhook syncs users to DB)
 - **Drizzle ORM** with `postgres` driver against **Supabase Postgres** (pgvector enabled)
 - **Supabase Storage** for file uploads (PDFs, markdown) — not used for auth or DB queries
-- **OpenAI** — GPT-4o for generation, text-embedding-3-small (1536-dim) for embeddings
+- **Vercel AI SDK** (`ai` + `@ai-sdk/openai`) — GPT-4o for generation, text-embedding-3-small (1536-dim) for embeddings; all LLM/embedding calls go through the AI SDK, never raw OpenAI client
 - **Tailwind CSS v4** + shadcn/ui
 - **Bun** as package manager
 
@@ -46,10 +46,10 @@ bunx drizzle-kit studio    # Open Drizzle Studio (DB browser)
 When an external agent sends a query through a plugin:
 
 1. **Authenticate** — validate API key, resolve plugin
-2. **Embed query** — OpenAI text-embedding-3-small
+2. **Embed query** — Vercel AI SDK `embed()` with OpenAI text-embedding-3-small
 3. **Retrieve sources** — pgvector cosine similarity on `knowledge_chunks` (top-K=8, threshold 0.75)
 4. **Decision tree evaluation** — walk JSON-based condition/question/action nodes
-5. **LLM generation** — GPT-4o with expert system prompt + retrieved chunks + decision path
+5. **LLM generation** — Vercel AI SDK `generateText()` with GPT-4o, expert system prompt + retrieved chunks + decision path
 6. **Citation post-processing** — map `[Source N]` refs to actual documents, compute confidence
 7. **Hallucination guard** — if confidence=low, replace answer with refusal
 8. **Audit log** — store query, response, citations, decision path, latency
@@ -87,6 +87,7 @@ TypeScript package (`@sme-plug/sdk`) with framework adapters:
 
 ## Key Patterns
 
+- **All LLM and embedding calls go through Vercel AI SDK** — use `generateText()`/`streamText()` from `ai` and `openai()` model from `@ai-sdk/openai`. Never import or use the raw `openai` npm package directly.
 - **Supabase is for Postgres + Storage only** — never use Supabase Auth or Supabase client for DB queries. All DB access goes through Drizzle.
 - **Decision trees are JSON** stored in a `jsonb` column, executed by a custom TypeScript engine in `lib/engine/decision-tree.ts`.
 - **Citations are mandatory by default** — every plugin response must link claims to source chunks.

@@ -74,7 +74,7 @@ SME-Plug is a **web platform + API**. It is NOT a CLI tool, not a library you im
 
 ### 3.3 Universal Agent Integration Layer
 
-- **Framework Adapters**: Pre-built adapters for LangChain, AutoGPT, CrewAI, OpenAI Assistants API, Vercel AI SDK
+- **Framework Adapters**: Pre-built adapters for LangChain, AutoGPT, CrewAI, OpenAI Assistants API
 - **REST API**: For any custom agent — POST the user query + plugin ID → get expert-augmented response
 - **Hot-Swap at Runtime**: Switch the active SME plugin mid-conversation without restart
 - **Multi-Plugin Stacking**: Combine plugins (e.g., "Structural Engineering" + "Indian Building Codes") with conflict resolution
@@ -94,7 +94,7 @@ SME-Plug is a **web platform + API**. It is NOT a CLI tool, not a library you im
 - [x] Initialize Next.js + TypeScript + Tailwind
 - [x] Add Clerk dependency
 - [x] Add Drizzle Kit dependency
-- [ ] Install missing packages (drizzle-orm, postgres, openai, @supabase/supabase-js, pdf-parse, zustand, zod, svix, shadcn/ui)
+- [ ] Install missing packages (drizzle-orm, postgres, ai, @ai-sdk/openai, @supabase/supabase-js, pdf-parse, zustand, zod, svix, shadcn/ui)
 - [ ] Set up Supabase project (Postgres + Storage + pgvector extension)
 - [ ] Add all env vars to `.env` (DATABASE_URL, SUPABASE_*, OPENAI_API_KEY, CLERK_WEBHOOK_SECRET)
 - [ ] Create `drizzle.config.ts`
@@ -109,7 +109,7 @@ SME-Plug is a **web platform + API**. It is NOT a CLI tool, not a library you im
 - [ ] Create `lib/auth.ts` with `requireUser()` helper
 
 ### Phase 2: Core Engine
-- [ ] `lib/engine/embedding.ts` — OpenAI text-embedding-3-small wrapper
+- [ ] `lib/engine/embedding.ts` — Vercel AI SDK `embed()` wrapper using `@ai-sdk/openai` text-embedding-3-small
 - [ ] `lib/engine/chunker.ts` — PDF/markdown text → chunks with metadata
 - [ ] `lib/utils/pdf-parser.ts` — PDF text extraction via pdf-parse
 - [ ] `lib/engine/retrieval.ts` — pgvector cosine similarity search (top-K, threshold)
@@ -152,7 +152,7 @@ SME-Plug is a **web platform + API**. It is NOT a CLI tool, not a library you im
 - [ ] Plugin ratings and reviews
 - [ ] Multi-plugin stacking with conflict resolution
 - [ ] Confidence scoring display in UI
-- [ ] CrewAI + Vercel AI SDK adapters
+- [ ] CrewAI adapter for SDK
 - [ ] Royalty/monetization system for plugin creators
 
 ---

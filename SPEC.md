@@ -11,9 +11,9 @@
 | **Vector Store** | **Supabase pgvector** | Embeddings stored alongside relational data — no separate Pinecone/Weaviate needed |
 | **File Storage** | **Supabase Storage** | PDF/markdown uploads stored in buckets, referenced by plugin |
 | **Auth** | **Clerk** | Drop-in auth UI, Google/GitHub OAuth, JWT sessions, middleware protection — zero custom auth code |
-| **AI / LLM** | **OpenAI API (GPT-4o)** | Embedding generation (text-embedding-3-small) + LLM for augmented responses |
+| **AI / LLM** | **Vercel AI SDK (`ai`) + OpenAI provider (`@ai-sdk/openai`)** | Unified streaming/generation API, provider-swappable; uses GPT-4o for generation + text-embedding-3-small for embeddings |
 | **PDF Parsing** | **pdf-parse** | Extract text from uploaded PDFs for chunking |
-| **Embeddings** | **OpenAI text-embedding-3-small** | 1536-dim vectors, cheap, fast, good quality |
+| **Embeddings** | **OpenAI text-embedding-3-small (via `@ai-sdk/openai`)** | 1536-dim vectors, cheap, fast, good quality — called through Vercel AI SDK's `embed()` |
 | **UI Components** | **shadcn/ui + Tailwind CSS** | Beautiful defaults, copy-paste components, rapid UI building |
 | **State Management** | **Zustand** | Lightweight, no boilerplate — for client-side state (decision tree editor, chat) |
 | **SDK Distribution** | **npm package (`@sme-plug/sdk`)** | TypeScript SDK that developers install to integrate plugins into their agents |
@@ -374,8 +374,8 @@ User Query
             ▼
 ┌───────────────────────┐
 │ 2. EMBED QUERY        │  Generate embedding for the user's question
-│    (text-embedding-   │  using OpenAI text-embedding-3-small
-│     3-small)          │
+│    (text-embedding-   │  using Vercel AI SDK embed() with OpenAI
+│     3-small)          │  text-embedding-3-small provider
 └───────────┬───────────┘
             │
             ▼
@@ -396,7 +396,7 @@ User Query
             │
             ▼
 ┌───────────────────────┐
-│ 5. LLM AUGMENTED      │  Send to GPT-4o with assembled prompt:
+│ 5. LLM AUGMENTED      │  Send to GPT-4o via Vercel AI SDK generateText():
 │    GENERATION         │  - System prompt (expert persona from plugin)
 │                       │  - Retrieved source chunks (with citation IDs)
 │                       │  - Decision tree reasoning path
@@ -675,7 +675,7 @@ hackx/
 │   │   │   └── storage.ts            # Supabase Storage client (file uploads only)
 │   │   ├── engine/
 │   │   │   ├── query-pipeline.ts     # Main query orchestrator
-│   │   │   ├── embedding.ts          # OpenAI embedding generation
+│   │   │   ├── embedding.ts          # Vercel AI SDK embed() wrapper
 │   │   │   ├── retrieval.ts          # pgvector similarity search (via Drizzle sql``)
 │   │   │   ├── decision-tree.ts      # Tree execution engine
 │   │   │   ├── citation.ts           # Citation post-processor
@@ -848,7 +848,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
-# OpenAI
+# OpenAI (read automatically by @ai-sdk/openai provider)
 OPENAI_API_KEY=sk-...
 
 # App
@@ -868,7 +868,8 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
     "drizzle-orm": "^0.33",
     "postgres": "^3.4",
     "@supabase/supabase-js": "^2.45",
-    "openai": "^4.55",
+    "ai": "^4",
+    "@ai-sdk/openai": "^1",
     "pdf-parse": "^1.1",
     "zustand": "^4.5",
     "zod": "^3.23",
