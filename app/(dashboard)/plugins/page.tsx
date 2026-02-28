@@ -4,7 +4,6 @@ import { db } from "@/lib/db";
 import { plugins } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Blocks } from "lucide-react";
 
@@ -21,12 +20,12 @@ export default async function PluginsPage() {
     <div>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">My Plugins</h1>
-          <p className="text-muted-foreground">
-            Create and manage your SME expert plugins
+          <h1 className="text-2xl font-bold text-white">My Plugins</h1>
+          <p className="text-[#a1a1a1]">
+            Create and manage your expert plugins
           </p>
         </div>
-        <Button asChild>
+        <Button className="bg-white text-black hover:bg-[#ccc] font-semibold" asChild>
           <Link href="/plugins/new">
             <Plus className="mr-2 h-4 w-4" />
             New Plugin
@@ -35,49 +34,49 @@ export default async function PluginsPage() {
       </div>
 
       {userPlugins.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Blocks className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mb-2 text-lg font-medium">No plugins yet</h3>
-            <p className="mb-6 text-center text-sm text-muted-foreground">
-              Create your first SME plugin to turn a generalist AI into a domain expert.
-            </p>
-            <Button asChild>
-              <Link href="/plugins/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Plugin
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-[#333] py-20">
+          <Blocks className="mb-4 h-12 w-12 text-[#444]" />
+          <h3 className="mb-2 text-lg font-semibold text-white">No plugins yet</h3>
+          <p className="mb-6 text-center text-sm text-[#a1a1a1]">
+            Create your first plugin to turn a generalist AI into a domain expert.
+          </p>
+          <Button className="bg-white text-black hover:bg-[#ccc] font-semibold" asChild>
+            <Link href="/plugins/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Plugin
+            </Link>
+          </Button>
+        </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {userPlugins.map((plugin) => (
             <Link key={plugin.id} href={`/plugins/${plugin.id}`}>
-              <Card className="transition-shadow hover:shadow-md">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{plugin.name}</CardTitle>
-                      <CardDescription className="font-mono text-xs">
-                        {plugin.slug}
-                      </CardDescription>
-                    </div>
-                    <Badge variant={plugin.isPublished ? "default" : "secondary"}>
-                      {plugin.isPublished ? "Published" : "Draft"}
-                    </Badge>
+              <div className="group rounded-md border border-[#262626] bg-[#0a0a0a] p-5 transition-all hover:border-[#333] hover:bg-[#111111]">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-bold text-white">{plugin.name}</h3>
+                    <p className="mt-0.5 text-xs text-[#666]">
+                      {plugin.slug}
+                    </p>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="line-clamp-2 text-sm text-muted-foreground">
-                    {plugin.description || "No description"}
-                  </p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <Badge variant="outline">{plugin.domain}</Badge>
-                    <span className="text-xs text-muted-foreground">v{plugin.version}</span>
-                  </div>
-                </CardContent>
-              </Card>
+                  <Badge
+                    variant={plugin.isPublished ? "default" : "secondary"}
+                    className={plugin.isPublished
+                      ? "bg-[#00d4aa]/10 text-[#00d4aa] border-[#00d4aa]/20"
+                      : "bg-[#1a1a1a] text-[#666] border-[#262626]"
+                    }
+                  >
+                    {plugin.isPublished ? "Published" : "Draft"}
+                  </Badge>
+                </div>
+                <p className="mt-3 line-clamp-2 text-sm text-[#a1a1a1]">
+                  {plugin.description || "No description"}
+                </p>
+                <div className="mt-3 flex items-center gap-2">
+                  <Badge variant="outline" className="border-[#333] text-[#888]">{plugin.domain}</Badge>
+                  <span className="text-xs text-[#666]">v{plugin.version}</span>
+                </div>
+              </div>
             </Link>
           ))}
         </div>

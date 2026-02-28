@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,84 +52,88 @@ export default function NewPluginPage() {
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-8">
         <Link
           href="/plugins"
-          className="mb-4 inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+          className="mb-4 inline-flex items-center text-sm text-[#666] transition-colors hover:text-white"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back to plugins
         </Link>
-        <h1 className="text-2xl font-bold">Create New Plugin</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-bold text-white">Create New Plugin</h1>
+        <p className="text-[#a1a1a1]">
           Define your expert persona and domain
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Plugin Details</CardTitle>
-          <CardDescription>
+      <div className="rounded-md border border-[#262626] bg-[#0a0a0a]">
+        <div className="border-b border-[#262626] p-6">
+          <h2 className="font-bold text-white">Plugin Details</h2>
+          <p className="mt-1 text-sm text-[#a1a1a1]">
             This defines who your AI expert is and what domain they cover.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name">Plugin Name</Label>
+              <Label htmlFor="name" className="text-[#ededed]">Plugin Name</Label>
               <Input
                 id="name"
                 name="name"
                 placeholder="e.g., Structural Engineering - IS 456"
                 required
+                className="border-[#262626] bg-[#111111] text-white placeholder:text-[#555] focus:border-[#444] focus:ring-0"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="domain">Domain</Label>
+              <Label htmlFor="domain" className="text-[#ededed]">Domain</Label>
               <Input
                 id="domain"
                 name="domain"
                 placeholder="e.g., structural-engineering"
                 required
+                className="border-[#262626] bg-[#111111] text-white placeholder:text-[#555] focus:border-[#444] focus:ring-0"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-[#666]">
                 A short category identifier for your plugin
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description" className="text-[#ededed]">Description</Label>
               <Textarea
                 id="description"
                 name="description"
                 placeholder="What does this plugin do? What domain does it cover?"
                 rows={3}
+                className="border-[#262626] bg-[#111111] text-white placeholder:text-[#555] focus:border-[#444] focus:ring-0"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="systemPrompt">Expert System Prompt</Label>
+              <Label htmlFor="systemPrompt" className="text-[#ededed]">Expert System Prompt</Label>
               <Textarea
                 id="systemPrompt"
                 name="systemPrompt"
-                placeholder="You are an expert structural engineer specializing in Indian building codes (IS 456:2000). You provide precise, cited answers about concrete design, reinforcement, and structural safety..."
+                placeholder="You are an expert structural engineer specializing in Indian building codes (IS 456:2000)..."
                 rows={6}
                 required
+                className="border-[#262626] bg-[#111111] text-white placeholder:text-[#555] focus:border-[#444] focus:ring-0"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-[#666]">
                 This defines the expert persona. Be specific about the domain,
                 standards, and expertise level.
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="citationMode">Citation Mode</Label>
+              <Label htmlFor="citationMode" className="text-[#ededed]">Citation Mode</Label>
               <Select name="citationMode" defaultValue="mandatory">
-                <SelectTrigger>
+                <SelectTrigger className="border-[#262626] bg-[#111111] text-white focus:ring-0">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-[#262626] bg-[#111111]">
                   <SelectItem value="mandatory">Mandatory — every claim must cite a source</SelectItem>
                   <SelectItem value="optional">Optional — citations encouraged but not required</SelectItem>
                   <SelectItem value="off">Off — no citations</SelectItem>
@@ -139,20 +142,20 @@ export default function NewPluginPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-[#ff4444]">{error}</p>
             )}
 
             <div className="flex gap-3">
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading} className="bg-white text-black hover:bg-[#ccc] font-semibold">
                 {loading ? "Creating..." : "Create Plugin"}
               </Button>
-              <Button type="button" variant="outline" asChild>
+              <Button type="button" variant="outline" className="border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white" asChild>
                 <Link href="/plugins">Cancel</Link>
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -13,19 +13,19 @@ import {
 
 export default function LandingPage() {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-[#0a0a0a]">
       {/* Nav */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <FlaskConical className="h-5 w-5 text-primary" />
-            SME-Plug
+      <header className="sticky top-0 z-50 border-b border-[#262626] bg-[#0a0a0a]/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight text-white">
+            <FlaskConical className="h-5 w-5" />
+            Lexic
           </Link>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="sm" className="text-[#a1a1a1] hover:text-white hover:bg-[#1a1a1a]" asChild>
               <Link href="/sign-in">Sign In</Link>
             </Button>
-            <Button size="sm" asChild>
+            <Button size="sm" className="bg-white text-black hover:bg-[#ccc] font-semibold" asChild>
               <Link href="/sign-up">Get Started</Link>
             </Button>
           </div>
@@ -33,88 +33,96 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="mx-auto max-w-6xl px-6 py-24 text-center md:py-32">
-        <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight md:text-6xl">
+      <section className="relative mx-auto max-w-6xl px-6 py-28 text-center md:py-40">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)]" />
+        <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-white md:text-6xl lg:text-7xl">
           Expert Brains for{" "}
-          <span className="text-primary">AI Agents</span>
+          <span className="bg-gradient-to-r from-white to-[#666] bg-clip-text text-transparent">
+            AI Agents
+          </span>
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
+        <p className="mx-auto mt-6 max-w-2xl text-base text-[#a1a1a1] leading-relaxed md:text-lg">
           Hot-swappable Subject Matter Expert plugins that turn generalist AI
           into verified domain specialists. Cited answers, decision-tree
           reasoning, zero hallucination.
         </p>
-        <div className="mt-8 flex items-center justify-center gap-4">
-          <Button size="lg" asChild>
+        <div className="mt-10 flex items-center justify-center gap-4">
+          <Button size="lg" className="bg-white text-black hover:bg-[#ccc] font-semibold h-12 px-8" asChild>
             <Link href="/sign-up">
               Start Building
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
-          <Button size="lg" variant="outline" asChild>
+          <Button size="lg" variant="outline" className="border-[#333] text-[#ededed] hover:bg-[#1a1a1a] hover:border-[#444] h-12 px-8" asChild>
             <Link href="#how-it-works">See How It Works</Link>
           </Button>
         </div>
 
         {/* Code snippet */}
-        <div className="mx-auto mt-12 max-w-xl rounded-lg border bg-card p-6 text-left">
-          <p className="mb-3 text-xs font-medium text-muted-foreground">
-            One API call. Any plugin. Instant expert.
-          </p>
-          <pre className="overflow-x-auto text-sm">
-            <code className="text-muted-foreground">
+        <div className="mx-auto mt-16 max-w-xl overflow-hidden rounded-md border border-[#262626] bg-[#111111]">
+          <div className="flex items-center gap-1.5 border-b border-[#262626] px-4 py-3">
+            <div className="h-2.5 w-2.5 rounded-full bg-[#333]" />
+            <div className="h-2.5 w-2.5 rounded-full bg-[#333]" />
+            <div className="h-2.5 w-2.5 rounded-full bg-[#333]" />
+            <span className="ml-2 text-xs text-[#666]">terminal</span>
+          </div>
+          <div className="p-5 text-left">
+            <pre className="overflow-x-auto text-sm leading-relaxed">
+              <code className="text-[#666]">
 {`POST /api/v1/query
 {
-  `}<span className="text-foreground">{`"plugin"`}</span>{`: "structural-eng-v1",
-  `}<span className="text-foreground">{`"query"`}</span>{`:  "Min cover for a beam in severe exposure?"
+  `}<span className="text-[#ededed]">{`"plugin"`}</span>{`: "structural-eng-v1",
+  `}<span className="text-[#ededed]">{`"query"`}</span>{`:  "Min cover for a beam in severe exposure?"
 }
 
-→ `}<span className="text-green-600 dark:text-green-400">{`"45mm nominal cover (IS 456, Table 16)" [Source 1]`}</span>{`
-→ confidence: `}<span className="text-green-600 dark:text-green-400">high</span>
-            </code>
-          </pre>
+→ `}<span className="text-[#00d4aa]">{`"45mm nominal cover (IS 456, Table 16)" [Source 1]`}</span>{`
+→ confidence: `}<span className="text-[#00d4aa]">high</span>
+              </code>
+            </pre>
+          </div>
         </div>
       </section>
 
       {/* Features */}
-      <section id="how-it-works" className="border-t bg-muted/30 py-20">
+      <section id="how-it-works" className="border-t border-[#262626] py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-4 text-center text-3xl font-bold">
-            How SME-Plug Works
+          <h2 className="mb-4 text-center text-3xl font-bold text-white">
+            How Lexic Works
           </h2>
-          <p className="mx-auto mb-12 max-w-2xl text-center text-muted-foreground">
+          <p className="mx-auto mb-14 max-w-2xl text-center text-[#a1a1a1]">
             Three actors, one API. Experts build plugins, developers query them,
             end users get better answers.
           </p>
 
-          <div className="grid gap-8 md:grid-cols-3">
-            <div className="rounded-lg border bg-card p-6">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950">
-                <BookOpen className="h-5 w-5 text-blue-600" />
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="group rounded-md border border-[#262626] bg-[#111111] p-6 transition-colors hover:border-[#333]">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-[#1a1a1a]">
+                <BookOpen className="h-5 w-5 text-[#3b82f6]" />
               </div>
-              <h3 className="mb-2 font-semibold">1. Expert Builds Plugin</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="mb-2 font-bold text-white">1. Expert Builds Plugin</h3>
+              <p className="text-sm leading-relaxed text-[#a1a1a1]">
                 Upload PDFs, standards, and reference documents. Define decision
                 trees for structured reasoning. Set citation rules.
               </p>
             </div>
 
-            <div className="rounded-lg border bg-card p-6">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-950">
-                <Code2 className="h-5 w-5 text-green-600" />
+            <div className="group rounded-md border border-[#262626] bg-[#111111] p-6 transition-colors hover:border-[#333]">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-[#1a1a1a]">
+                <Code2 className="h-5 w-5 text-[#00d4aa]" />
               </div>
-              <h3 className="mb-2 font-semibold">2. Developer Integrates</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="mb-2 font-bold text-white">2. Developer Integrates</h3>
+              <p className="text-sm leading-relaxed text-[#a1a1a1]">
                 One API call or SDK wrapper. Works with LangChain, AutoGPT, or
                 any custom agent. No training required.
               </p>
             </div>
 
-            <div className="rounded-lg border bg-card p-6">
-              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-950">
-                <Zap className="h-5 w-5 text-purple-600" />
+            <div className="group rounded-md border border-[#262626] bg-[#111111] p-6 transition-colors hover:border-[#333]">
+              <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-[#1a1a1a]">
+                <Zap className="h-5 w-5 text-[#a855f7]" />
               </div>
-              <h3 className="mb-2 font-semibold">3. User Gets Answers</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="mb-2 font-bold text-white">3. User Gets Answers</h3>
+              <p className="text-sm leading-relaxed text-[#a1a1a1]">
                 Cited, decision-tree-backed answers from their existing AI tools.
                 Source-linked, auditable, hallucination-free.
               </p>
@@ -124,12 +132,12 @@ export default function LandingPage() {
       </section>
 
       {/* Key features grid */}
-      <section className="py-20">
+      <section className="border-t border-[#262626] py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-12 text-center text-3xl font-bold">
-            Why SME-Plug?
+          <h2 className="mb-14 text-center text-3xl font-bold text-white">
+            Why Lexic?
           </h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-px overflow-hidden rounded-md border border-[#262626] bg-[#262626] sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 icon: RefreshCw,
@@ -164,11 +172,11 @@ export default function LandingPage() {
             ].map((feature) => (
               <div
                 key={feature.title}
-                className="rounded-lg border p-5 transition-shadow hover:shadow-sm"
+                className="bg-[#0a0a0a] p-6 transition-colors hover:bg-[#111111]"
               >
-                <feature.icon className="mb-3 h-5 w-5 text-primary" />
-                <h3 className="mb-1 font-semibold">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground">{feature.desc}</p>
+                <feature.icon className="mb-3 h-5 w-5 text-[#a1a1a1]" />
+                <h3 className="mb-1.5 font-bold text-white">{feature.title}</h3>
+                <p className="text-sm leading-relaxed text-[#888]">{feature.desc}</p>
               </div>
             ))}
           </div>
@@ -176,14 +184,14 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="border-t bg-muted/30 py-20">
+      <section className="border-t border-[#262626] py-24">
         <div className="mx-auto max-w-2xl px-6 text-center">
-          <h2 className="text-3xl font-bold">Ready to build your expert plugin?</h2>
-          <p className="mt-4 text-muted-foreground">
+          <h2 className="text-3xl font-bold text-white">Ready to build your expert plugin?</h2>
+          <p className="mt-4 text-[#a1a1a1]">
             Create a plugin in minutes. Upload your domain knowledge, define
             reasoning trees, and give any AI agent expert-grade capabilities.
           </p>
-          <Button size="lg" className="mt-8" asChild>
+          <Button size="lg" className="mt-10 bg-white text-black hover:bg-[#ccc] font-semibold h-12 px-8" asChild>
             <Link href="/sign-up">
               Get Started Free
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -193,13 +201,13 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-8">
+      <footer className="border-t border-[#262626] py-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-[#666]">
             <FlaskConical className="h-4 w-4" />
-            SME-Plug
+            Lexic
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[#666]">
             Built for HackX 2026
           </p>
         </div>

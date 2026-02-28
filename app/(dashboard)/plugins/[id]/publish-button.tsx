@@ -34,6 +34,10 @@ export function PublishButton({
       onClick={togglePublish}
       disabled={loading}
       variant={isPublished ? "outline" : "default"}
+      className={isPublished
+        ? "border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white"
+        : "bg-white text-black hover:bg-[#ccc] font-semibold"
+      }
     >
       {isPublished ? (
         <>

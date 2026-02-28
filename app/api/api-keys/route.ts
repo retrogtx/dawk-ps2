@@ -6,22 +6,24 @@ import { eq, and } from "drizzle-orm";
 import { generateApiKey } from "@/lib/utils/api-key";
 
 export async function GET() {
+  let user;
   try {
-    const user = await requireUser();
-    const keys = await db
-      .select({
-        id: apiKeys.id,
-        name: apiKeys.name,
-        keyPrefix: apiKeys.keyPrefix,
-        lastUsedAt: apiKeys.lastUsedAt,
-        createdAt: apiKeys.createdAt,
-      })
-      .from(apiKeys)
-      .where(eq(apiKeys.userId, user.id));
-    return NextResponse.json(keys);
+    user = await requireUser();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const keys = await db
+    .select({
+      id: apiKeys.id,
+      name: apiKeys.name,
+      keyPrefix: apiKeys.keyPrefix,
+      lastUsedAt: apiKeys.lastUsedAt,
+      createdAt: apiKeys.createdAt,
+    })
+    .from(apiKeys)
+    .where(eq(apiKeys.userId, user.id));
+  return NextResponse.json(keys);
 }
 
 export async function POST(req: NextRequest) {
@@ -52,29 +54,31 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  let user;
   try {
-    const user = await requireUser();
-    const { searchParams } = new URL(req.url);
-    const keyId = searchParams.get("id");
-
-    if (!keyId) {
-      return NextResponse.json({ error: "Missing key ID" }, { status: 400 });
-    }
-
-    const existing = await db.query.apiKeys.findFirst({
-      where: and(eq(apiKeys.id, keyId), eq(apiKeys.userId, user.id)),
-    });
-
-    if (!existing) {
-      return NextResponse.json({ error: "API key not found" }, { status: 404 });
-    }
-
-    await db
-      .delete(apiKeys)
-      .where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, user.id)));
-
-    return NextResponse.json({ success: true });
+    user = await requireUser();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { searchParams } = new URL(req.url);
+  const keyId = searchParams.get("id");
+
+  if (!keyId) {
+    return NextResponse.json({ error: "Missing key ID" }, { status: 400 });
+  }
+
+  const existing = await db.query.apiKeys.findFirst({
+    where: and(eq(apiKeys.id, keyId), eq(apiKeys.userId, user.id)),
+  });
+
+  if (!existing) {
+    return NextResponse.json({ error: "API key not found" }, { status: 404 });
+  }
+
+  await db
+    .delete(apiKeys)
+    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, user.id)));
+
+  return NextResponse.json({ success: true });
 }

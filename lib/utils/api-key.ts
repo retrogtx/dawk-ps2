@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from "crypto";
 
-const PREFIX = "sme_";
+const PREFIX = "lx_";
 
 export function generateApiKey(): { key: string; hash: string; prefix: string } {
   const raw = randomBytes(32).toString("hex");

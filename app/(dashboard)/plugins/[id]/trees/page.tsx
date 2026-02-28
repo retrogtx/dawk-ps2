@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -156,7 +155,7 @@ export default function DecisionTreesPage() {
     <div>
       <Link
         href={`/plugins/${pluginId}`}
-        className="mb-4 inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+        className="mb-4 inline-flex items-center text-sm text-[#666] transition-colors hover:text-white"
       >
         <ArrowLeft className="mr-1 h-4 w-4" />
         Back to plugin
@@ -164,61 +163,63 @@ export default function DecisionTreesPage() {
 
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Decision Trees</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold text-white">Decision Trees</h1>
+          <p className="text-[#a1a1a1]">
             Define structured reasoning flows for domain-specific logic
           </p>
         </div>
-        <Button onClick={() => setCreating(!creating)}>
+        <Button onClick={() => setCreating(!creating)} className="bg-white text-black hover:bg-[#ccc] font-semibold">
           <Plus className="mr-2 h-4 w-4" />
           New Tree
         </Button>
       </div>
 
       {creating && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Create Decision Tree</CardTitle>
-            <CardDescription>
+        <div className="mb-6 rounded-md border border-[#262626] bg-[#0a0a0a]">
+          <div className="border-b border-[#262626] p-6">
+            <h2 className="font-bold text-white">Create Decision Tree</h2>
+            <p className="mt-1 text-sm text-[#a1a1a1]">
               Define the tree as JSON. Each node can be a condition, question, or
               action.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div className="p-6">
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Tree Name</Label>
+                <Label htmlFor="name" className="text-[#ededed]">Tree Name</Label>
                 <Input
                   id="name"
                   name="name"
                   placeholder="e.g., Beam Cover Check"
                   required
+                  className="border-[#262626] bg-[#111111] text-white placeholder:text-[#555] focus:border-[#444] focus:ring-0"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description" className="text-[#ededed]">Description</Label>
                 <Input
                   id="description"
                   name="description"
                   placeholder="Determines required cover based on member type and exposure"
+                  className="border-[#262626] bg-[#111111] text-white placeholder:text-[#555] focus:border-[#444] focus:ring-0"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="treeData">Tree JSON</Label>
+                <Label htmlFor="treeData" className="text-[#ededed]">Tree JSON</Label>
                 <Textarea
                   id="treeData"
                   name="treeData"
                   defaultValue={EXAMPLE_TREE}
                   rows={20}
-                  className="font-mono text-xs"
+                  className="border-[#262626] bg-[#111111] text-white text-xs focus:border-[#444] focus:ring-0"
                   required
                 />
               </div>
 
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && <p className="text-sm text-[#ff4444]">{error}</p>}
 
               <div className="flex gap-3">
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" disabled={loading} className="bg-white text-black hover:bg-[#ccc] font-semibold">
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -232,50 +233,52 @@ export default function DecisionTreesPage() {
                   type="button"
                   variant="outline"
                   onClick={() => setCreating(false)}
+                  className="border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white"
                 >
                   Cancel
                 </Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {trees.length === 0 && !creating ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center py-12">
-            <GitBranch className="mb-3 h-10 w-10 text-muted-foreground/50" />
-            <p className="mb-4 text-sm text-muted-foreground">
-              No decision trees yet. Trees add structured reasoning to your
-              plugin.
-            </p>
-            <Button onClick={() => setCreating(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create First Tree
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center rounded-md border border-dashed border-[#333] py-16">
+          <GitBranch className="mb-3 h-10 w-10 text-[#333]" />
+          <p className="mb-4 text-sm text-[#a1a1a1]">
+            No decision trees yet. Trees add structured reasoning to your
+            plugin.
+          </p>
+          <Button onClick={() => setCreating(true)} className="bg-white text-black hover:bg-[#ccc] font-semibold">
+            <Plus className="mr-2 h-4 w-4" />
+            Create First Tree
+          </Button>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {trees.map((tree) => (
-            <Card key={tree.id}>
-              <CardContent className="flex items-center justify-between py-4">
-                <div className="flex items-center gap-3">
-                  <GitBranch className="h-5 w-5 text-green-500" />
-                  <div>
-                    <p className="font-medium">{tree.name}</p>
-                    {tree.description && (
-                      <p className="text-sm text-muted-foreground">
-                        {tree.description}
-                      </p>
-                    )}
-                  </div>
+            <div key={tree.id} className="flex items-center justify-between rounded-md border border-[#262626] bg-[#0a0a0a] p-4 transition-colors hover:border-[#333]">
+              <div className="flex items-center gap-3">
+                <GitBranch className="h-5 w-5 text-[#00d4aa]" />
+                <div>
+                  <p className="font-semibold text-white">{tree.name}</p>
+                  {tree.description && (
+                    <p className="text-sm text-[#a1a1a1]">
+                      {tree.description}
+                    </p>
+                  )}
                 </div>
-                <Badge variant={tree.isActive ? "default" : "secondary"}>
-                  {tree.isActive ? "Active" : "Inactive"}
-                </Badge>
-              </CardContent>
-            </Card>
+              </div>
+              <Badge
+                className={tree.isActive
+                  ? "bg-[#00d4aa]/10 text-[#00d4aa] border-[#00d4aa]/20"
+                  : "bg-[#1a1a1a] text-[#666] border-[#262626]"
+                }
+              >
+                {tree.isActive ? "Active" : "Inactive"}
+              </Badge>
+            </div>
           ))}
         </div>
       )}

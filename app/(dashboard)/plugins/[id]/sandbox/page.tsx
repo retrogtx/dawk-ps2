@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Send, Loader2, Bot, User } from "lucide-react";
@@ -106,29 +105,29 @@ export default function SandboxPage() {
       <div className="mb-4">
         <Link
           href={`/plugins/${pluginId}`}
-          className="mb-2 inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+          className="mb-2 inline-flex items-center text-sm text-[#666] transition-colors hover:text-white"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back to plugin
         </Link>
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">Test Sandbox</h1>
+          <h1 className="text-2xl font-bold text-white">Test Sandbox</h1>
           {plugin && (
-            <Badge variant="outline">{plugin.name}</Badge>
+            <Badge variant="outline" className="border-[#333] text-[#888]">{plugin.name}</Badge>
           )}
         </div>
-        <p className="text-muted-foreground">
+        <p className="text-[#a1a1a1]">
           Chat with your plugin to test responses, citations, and decision tree behavior
         </p>
       </div>
 
-      <Card className="flex flex-1 flex-col overflow-hidden">
-        <CardContent className="flex-1 overflow-y-auto p-4">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-[#262626] bg-[#0a0a0a]">
+        <div className="flex-1 overflow-y-auto p-4">
           {messages.length === 0 ? (
             <div className="flex h-full items-center justify-center text-center">
               <div>
-                <Bot className="mx-auto mb-3 h-12 w-12 text-muted-foreground/30" />
-                <p className="text-muted-foreground">
+                <Bot className="mx-auto mb-3 h-12 w-12 text-[#333]" />
+                <p className="text-[#a1a1a1]">
                   Ask a question to test your plugin
                 </p>
               </div>
@@ -141,59 +140,58 @@ export default function SandboxPage() {
                   className={`flex gap-3 ${msg.role === "user" ? "justify-end" : ""}`}
                 >
                   {msg.role === "assistant" && (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <Bot className="h-4 w-4" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1a1a1a] border border-[#262626]">
+                      <Bot className="h-4 w-4 text-[#a1a1a1]" />
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] rounded-lg px-4 py-3 ${
+                    className={`max-w-[80%] rounded-md px-4 py-3 ${
                       msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
+                        ? "bg-white text-black"
+                        : "border border-[#262626] bg-[#111111]"
                     }`}
                   >
                     <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
 
                     {msg.confidence && (
                       <Badge
-                        className="mt-2"
-                        variant={
+                        className={`mt-2 ${
                           msg.confidence === "high"
-                            ? "default"
+                            ? "bg-[#00d4aa]/10 text-[#00d4aa] border-[#00d4aa]/20"
                             : msg.confidence === "medium"
-                              ? "secondary"
-                              : "destructive"
-                        }
+                              ? "bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20"
+                              : "bg-[#ff4444]/10 text-[#ff4444] border-[#ff4444]/20"
+                        }`}
                       >
                         Confidence: {msg.confidence}
                       </Badge>
                     )}
 
                     {msg.citations && msg.citations.length > 0 && (
-                      <div className="mt-3 space-y-2 border-t pt-2">
-                        <p className="text-xs font-medium opacity-70">Sources:</p>
+                      <div className="mt-3 space-y-2 border-t border-[#262626] pt-2">
+                        <p className="text-xs font-semibold text-[#666]">Sources:</p>
                         {msg.citations.map((c) => (
                           <div
                             key={c.id}
-                            className="rounded bg-background/50 p-2 text-xs"
+                            className="rounded-lg bg-[#1a1a1a] p-2 text-xs"
                           >
-                            <span className="font-medium">{c.document}</span>
+                            <span className="font-semibold text-[#ededed]">{c.document}</span>
                             {c.section && (
-                              <span className="opacity-70"> — {c.section}</span>
+                              <span className="text-[#666]"> — {c.section}</span>
                             )}
-                            <p className="mt-1 opacity-60">{c.excerpt}</p>
+                            <p className="mt-1 text-[#888]">{c.excerpt}</p>
                           </div>
                         ))}
                       </div>
                     )}
 
                     {msg.decisionPath && msg.decisionPath.length > 0 && (
-                      <div className="mt-3 space-y-1 border-t pt-2">
-                        <p className="text-xs font-medium opacity-70">
+                      <div className="mt-3 space-y-1 border-t border-[#262626] pt-2">
+                        <p className="text-xs font-semibold text-[#666]">
                           Decision Path:
                         </p>
                         {msg.decisionPath.map((step) => (
-                          <div key={step.step} className="text-xs opacity-60">
+                          <div key={step.step} className="text-xs text-[#888]">
                             {step.step}. {step.label}
                             {step.value && ` → ${step.value}`}
                             {step.result && ` → ${step.result}`}
@@ -203,42 +201,43 @@ export default function SandboxPage() {
                     )}
                   </div>
                   {msg.role === "user" && (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                      <User className="h-4 w-4" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1a1a1a] border border-[#262626]">
+                      <User className="h-4 w-4 text-[#a1a1a1]" />
                     </div>
                   )}
                 </div>
               ))}
               {loading && (
                 <div className="flex gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    <Bot className="h-4 w-4" />
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1a1a1a] border border-[#262626]">
+                    <Bot className="h-4 w-4 text-[#a1a1a1]" />
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg bg-muted px-4 py-3">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Thinking...</span>
+                  <div className="flex items-center gap-2 rounded-md border border-[#262626] bg-[#111111] px-4 py-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-[#a1a1a1]" />
+                    <span className="text-sm text-[#a1a1a1]">Thinking...</span>
                   </div>
                 </div>
               )}
               <div ref={messagesEndRef} />
             </div>
           )}
-        </CardContent>
+        </div>
 
-        <div className="border-t p-4">
+        <div className="border-t border-[#262626] p-4">
           <form onSubmit={handleSend} className="flex gap-2">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask a question..."
               disabled={loading}
+              className="border-[#262626] bg-[#111111] text-white placeholder:text-[#555] focus:border-[#444] focus:ring-0"
             />
-            <Button type="submit" disabled={loading || !input.trim()}>
+            <Button type="submit" disabled={loading || !input.trim()} className="bg-white text-black hover:bg-[#ccc]">
               <Send className="h-4 w-4" />
             </Button>
           </form>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
