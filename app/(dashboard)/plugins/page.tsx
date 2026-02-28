@@ -55,9 +55,6 @@ export default async function PluginsPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-bold text-white">{plugin.name}</h3>
-                    <p className="mt-0.5 text-xs text-[#666]">
-                      {plugin.slug}
-                    </p>
                   </div>
                   <Badge
                     variant={plugin.isPublished ? "default" : "secondary"}
@@ -72,9 +69,8 @@ export default async function PluginsPage() {
                 <p className="mt-3 line-clamp-2 text-sm text-[#a1a1a1]">
                   {plugin.description || "No description"}
                 </p>
-                <div className="mt-3 flex items-center gap-2">
+                <div className="mt-3">
                   <Badge variant="outline" className="border-[#333] text-[#888]">{plugin.domain}</Badge>
-                  <span className="text-xs text-[#666]">v{plugin.version}</span>
                 </div>
               </div>
             </Link>

@@ -53,11 +53,6 @@ export default async function PluginDetailPage({
             <h1 className="text-2xl font-bold text-white">{plugin.name}</h1>
             <PublishButton pluginId={plugin.id} isPublished={plugin.isPublished} />
           </div>
-          {plugin.slug !== plugin.name && (
-            <p className="mt-1 text-sm text-[#666]">
-              {plugin.slug}
-            </p>
-          )}
           {plugin.description && (
             <p className="mt-2 text-[#a1a1a1]">{plugin.description}</p>
           )}
