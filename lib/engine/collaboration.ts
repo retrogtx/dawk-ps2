@@ -155,7 +155,6 @@ function formatRoundForContext(round: CollaborationRoundData): string {
 async function synthesizeConsensus(
   query: string,
   rounds: CollaborationRoundData[],
-  _experts: ResolvedExpert[],
 ): Promise<ConsensusData> {
   const deliberationTranscript = rounds.map(formatRoundForContext).join("\n\n");
 
@@ -283,7 +282,7 @@ export async function runCollaboration(config: CollaborationConfig): Promise<Col
     }
   }
 
-  const consensus = await synthesizeConsensus(query, rounds, experts);
+  const consensus = await synthesizeConsensus(query, rounds);
 
   return {
     rounds,
@@ -457,7 +456,7 @@ export async function streamCollaboration(
           message: "Synthesizing consensus from all experts...",
         }));
 
-        const consensus = await synthesizeConsensus(query, rounds, experts);
+        const consensus = await synthesizeConsensus(query, rounds);
 
         controller.enqueue(sse({
           type: "done",
