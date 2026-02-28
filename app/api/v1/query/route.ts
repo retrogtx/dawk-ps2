@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Run pipeline
-    const result = await runQueryPipeline(pluginSlug, query, apiKey.id);
+    const result = await runQueryPipeline(pluginSlug, query, apiKey.id, apiKey.userId);
 
     return NextResponse.json(result);
   } catch (error) {
