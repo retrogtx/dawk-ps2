@@ -14,7 +14,7 @@
  */
 
 import { Lexic, LexicAPIError } from "./index";
-import type { QueryResult } from "./types";
+import type { QueryResult, QueryRequestOptions } from "./types";
 
 export interface LexicAutoGPTConfig {
   apiKey: string;
@@ -22,6 +22,8 @@ export interface LexicAutoGPTConfig {
   baseUrl?: string;
   commandName?: string;
   commandDescription?: string;
+  /** Default query options applied to every execution. */
+  queryOptions?: QueryRequestOptions;
 }
 
 export interface AutoGPTCommand {
@@ -40,6 +42,7 @@ export class LexicAutoGPT {
   private plugin: string;
   private commandName: string;
   private commandDescription: string;
+  private queryOptions?: QueryRequestOptions;
 
   constructor(config: LexicAutoGPTConfig) {
     this.client = new Lexic({
@@ -47,6 +50,7 @@ export class LexicAutoGPT {
       baseUrl: config.baseUrl,
     });
     this.plugin = config.plugin;
+    this.queryOptions = config.queryOptions;
     this.commandName =
       config.commandName || `consult_${config.plugin.replace(/-/g, "_")}`;
     this.commandDescription =
@@ -72,33 +76,16 @@ export class LexicAutoGPT {
     };
   }
 
-  /** Execute a query directly. */
+  /** Execute a query directly. Returns human-readable formatted text. */
   async execute(query: string): Promise<string> {
     try {
       const result: QueryResult = await this.client.query({
         plugin: this.plugin,
         query,
+        options: this.queryOptions,
       });
 
-      return [
-        `Expert Answer (confidence: ${result.confidence}):`,
-        result.answer,
-        "",
-        "Citations:",
-        ...result.citations.map(
-          (c, i) =>
-            `  [${i + 1}] ${c.document}${c.section ? ` — ${c.section}` : ""}`,
-        ),
-        ...(result.decisionPath.length > 0
-          ? [
-              "",
-              "Decision Path:",
-              ...result.decisionPath.map(
-                (s) => `  Step ${s.step}: ${s.label}${s.value ? ` → ${s.value}` : ""}`,
-              ),
-            ]
-          : []),
-      ].join("\n");
+      return formatResultForAutoGPT(result);
     } catch (err) {
       if (err instanceof LexicAPIError) {
         return `Lexic Error (${err.status}): ${err.message}`;
@@ -111,4 +98,40 @@ export class LexicAutoGPT {
   setPlugin(pluginSlug: string): void {
     this.plugin = pluginSlug;
   }
+}
+
+/**
+ * Format a QueryResult into human-readable text for AutoGPT consumption.
+ * Gracefully handles missing/empty fields.
+ */
+function formatResultForAutoGPT(result: QueryResult): string {
+  const lines: string[] = [
+    `Expert Answer (confidence: ${result.confidence}):`,
+    result.answer,
+  ];
+
+  const citations = result.citations ?? [];
+  if (citations.length > 0) {
+    lines.push("", "Citations:");
+    for (let i = 0; i < citations.length; i++) {
+      const c = citations[i];
+      let ref = `  [${i + 1}] ${c.document}`;
+      if (c.page != null) ref += `, p.${c.page}`;
+      if (c.section) ref += ` — ${c.section}`;
+      lines.push(ref);
+    }
+  }
+
+  const decisionPath = result.decisionPath ?? [];
+  if (decisionPath.length > 0) {
+    lines.push("", "Decision Path:");
+    for (const step of decisionPath) {
+      let entry = `  Step ${step.step}: ${step.label}`;
+      if (step.value) entry += ` → ${step.value}`;
+      if (step.result) entry += ` (${step.result})`;
+      lines.push(entry);
+    }
+  }
+
+  return lines.join("\n");
 }

@@ -24,7 +24,10 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { query } = body;
+    const { query, history } = body as {
+      query?: string;
+      history?: Array<{ role: "user" | "assistant"; content: string }>;
+    };
 
     if (!query) {
       return NextResponse.json({ error: "Missing query" }, { status: 400 });
@@ -33,7 +36,7 @@ export async function POST(
     const stream = await streamQueryPipeline(plugin.slug, query, undefined, {
       skipPublishCheck: true,
       skipAuditLog: true,
-    });
+    }, history);
 
     return new Response(stream, {
       headers: {

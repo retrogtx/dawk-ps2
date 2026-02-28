@@ -284,74 +284,44 @@ CREATE INDEX IF NOT EXISTS kc_embedding_idx
   USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 ```
 
-### Clerk → Database User Sync (Webhook)
+### Auth Helper (Clerk → DB User, Auto-Create)
+
+No webhook is needed. User records are created on-demand when `requireUser()` is called — if the Clerk user exists but has no DB row, one is auto-created via upsert:
 
 ```typescript
-// src/app/api/webhooks/clerk/route.ts
+// lib/auth.ts
 
-import { Webhook } from "svix";
-import { headers } from "next/headers";
-import { WebhookEvent } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-export async function POST(req: Request) {
-  const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET!;
-  const headerPayload = await headers();
-  const svixId = headerPayload.get("svix-id");
-  const svixTimestamp = headerPayload.get("svix-timestamp");
-  const svixSignature = headerPayload.get("svix-signature");
-
-  const body = await req.text();
-  const wh = new Webhook(WEBHOOK_SECRET);
-  const evt = wh.verify(body, {
-    "svix-id": svixId!,
-    "svix-timestamp": svixTimestamp!,
-    "svix-signature": svixSignature!,
-  }) as WebhookEvent;
-
-  if (evt.type === "user.created" || evt.type === "user.updated") {
-    const { id, email_addresses, first_name, last_name, image_url } = evt.data;
-    const email = email_addresses[0]?.email_address ?? "";
-    const displayName = [first_name, last_name].filter(Boolean).join(" ") || email;
-
-    await db
-      .insert(users)
-      .values({ clerkId: id, email, displayName, avatarUrl: image_url })
-      .onConflictDoUpdate({
-        target: users.clerkId,
-        set: { email, displayName, avatarUrl: image_url },
-      });
-  }
-
-  if (evt.type === "user.deleted") {
-    await db.delete(users).where(eq(users.clerkId, evt.data.id!));
-  }
-
-  return new Response("OK", { status: 200 });
-}
-```
-
-### Auth Helper (Clerk → DB User)
-
-```typescript
-// src/lib/auth.ts
-
-import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-
-/** Get the authenticated user's DB record. Throws if not signed in. */
 export async function requireUser() {
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
-  const user = await db.query.users.findFirst({
+  const existing = await db.query.users.findFirst({
     where: eq(users.clerkId, userId),
   });
-  if (!user) throw new Error("User not found in database");
+  if (existing) return existing;
+
+  // Auto-create from Clerk profile
+  const clerkUser = await currentUser();
+  if (!clerkUser) throw new Error("Unauthorized");
+
+  const [user] = await db
+    .insert(users)
+    .values({
+      clerkId: userId,
+      email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
+      displayName: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || email,
+      avatarUrl: clerkUser.imageUrl,
+    })
+    .onConflictDoUpdate({
+      target: users.clerkId,
+      set: { email, displayName, avatarUrl: clerkUser.imageUrl },
+    })
+    .returning();
 
   return user;
 }
@@ -548,7 +518,10 @@ Headers: { "Authorization": "Bearer lx_xxxxx" }
 Body: {
   "plugin": "structural-engineering-v1",
   "query": "What is the minimum cover for a beam exposed to weather?",
-  "context": [],               // optional prior conversation
+  "context": [                  // optional prior conversation
+    { "role": "user", "content": "..." },
+    { "role": "assistant", "content": "..." }
+  ],
   "options": {
     "citationMode": "inline",  // 'inline' | 'footnote' | 'off'
     "maxSources": 5,
@@ -575,6 +548,13 @@ Response: {
   "confidence": "high",
   "pluginVersion": "1.0.0"
 }
+
+// Streaming: set "stream": true in body or Accept: text/event-stream header.
+// Server sends SSE events:
+//   data: { "type": "status", "status": "searching_kb", "message": "..." }
+//   data: { "type": "delta", "text": "token..." }
+//   data: { "type": "done", "answer": "...", "citations": [...], "decisionPath": [...], "confidence": "high", "pluginVersion": "1.0.0" }
+//   data: { "type": "error", "error": "..." }
 ```
 
 ### 6.5 Marketplace (Public)
@@ -589,28 +569,65 @@ GET /api/marketplace/:slug/stats        — Usage statistics
 
 ## 7. SDK Design (`lexic-sdk`)
 
+### 7.1 Core Client
+
 ```typescript
 import { Lexic } from "lexic-sdk";
 
 // Initialize
 const lexic = new Lexic({
   apiKey: "lx_xxxxx",
+  baseUrl: "https://...",          // optional — custom API endpoint
+  defaultPlugin: "my-plugin-v1",   // optional — default plugin for queries
+  timeout: 30000,                  // optional — request timeout in ms (default: 120s)
 });
 
 // Query a plugin
 const result = await lexic.query({
   plugin: "structural-engineering-v1",
   query: "What is the minimum cover for an RCC column?",
+  context: [                        // optional — conversation history
+    { role: "user", content: "prior question" },
+    { role: "assistant", content: "prior answer" },
+  ],
+  options: {                        // optional — per-request settings
+    citationMode: "inline",         // 'inline' | 'footnote' | 'off'
+    maxSources: 5,
+    includeDecisionPath: true,
+  },
 });
 
-console.log(result.answer);       // cited answer
-console.log(result.citations);    // source references
+console.log(result.answer);       // cited answer (normalized, cleaned of phantom refs)
+console.log(result.citations);    // source references with full metadata
 console.log(result.decisionPath); // reasoning trace
+console.log(result.confidence);   // "high" | "medium" | "low"
+console.log(result.pluginVersion);
 
 // Hot-swap plugin at runtime
 lexic.setActivePlugin("hvac-design-v1");
+```
 
-// LangChain integration
+### 7.2 Streaming
+
+```typescript
+// Token-by-token streaming with pipeline status events
+for await (const event of lexic.queryStream({ plugin: "my-plugin", query: "..." })) {
+  if (event.type === "status") console.log(`[${event.status}] ${event.message}`);
+  if (event.type === "delta") process.stdout.write(event.text);
+  if (event.type === "done") console.log(event.answer, event.citations);
+  if (event.type === "error") console.error(event.error);
+}
+
+// Or: stream with progress callbacks, resolve to a single QueryResult
+const result = await lexic.queryStreamToResult(
+  { plugin: "my-plugin", query: "..." },
+  (event) => { if (event.type === "delta") process.stdout.write(event.text); },
+);
+```
+
+### 7.3 LangChain Integration
+
+```typescript
 import { LexicTool } from "lexic-sdk/langchain";
 
 const tool = new LexicTool({
@@ -618,15 +635,46 @@ const tool = new LexicTool({
   plugin: "structural-engineering-v1",
   name: "structural_expert",
   description: "Consult a structural engineering expert with cited sources",
+  queryOptions: { citationMode: "inline", maxSources: 5 },  // optional defaults
 });
 
-// Use in a LangChain agent
+// Use in a LangChain agent — returns JSON with answer, citations, confidence, decisionPath
 const agent = createOpenAIToolsAgent({
   llm,
   tools: [tool, ...otherTools],
   prompt,
 });
+
+// Hot-swap mid-conversation
+tool.setPlugin("hvac-design-v1");
 ```
+
+### 7.4 AutoGPT Integration
+
+```typescript
+import { LexicAutoGPT } from "lexic-sdk/autogpt";
+
+const adapter = new LexicAutoGPT({
+  apiKey: "lx_xxxxx",
+  plugin: "structural-engineering-v1",
+  queryOptions: { citationMode: "inline" },  // optional defaults
+});
+
+// Register as an AutoGPT command — returns human-readable text with citations
+const command = adapter.asCommand();
+```
+
+### 7.5 Response Normalization
+
+The SDK normalizes all API responses before returning them. Missing fields, wrong types, and unexpected shapes are handled gracefully:
+
+- `answer` defaults to `""` if missing or non-string
+- `citations` and `decisionPath` default to `[]` if missing or non-array
+- `confidence` defaults to `"low"` if missing or invalid
+- `pluginVersion` defaults to `"unknown"` if missing
+- Each citation and decision step is individually validated
+
+This ensures callers always receive a predictable `QueryResult` regardless of API version.
 
 ---
 
@@ -634,96 +682,80 @@ const agent = createOpenAIToolsAgent({
 
 ```
 hackx/
-├── src/
-│   ├── app/                          # Next.js App Router
-│   │   ├── (auth)/                   # Clerk auth pages
-│   │   │   ├── sign-in/[[...sign-in]]/page.tsx  # Clerk <SignIn />
-│   │   │   └── sign-up/[[...sign-up]]/page.tsx  # Clerk <SignUp />
-│   │   ├── (dashboard)/              # Authenticated pages (behind Clerk middleware)
-│   │   │   ├── plugins/
-│   │   │   │   ├── page.tsx          # List my plugins
-│   │   │   │   ├── new/page.tsx      # Create plugin
-│   │   │   │   └── [id]/
-│   │   │   │       ├── page.tsx      # Plugin detail/edit
-│   │   │   │       ├── knowledge/page.tsx  # Manage knowledge base
-│   │   │   │       ├── trees/page.tsx      # Decision tree editor
-│   │   │   │       └── sandbox/page.tsx    # Test sandbox
-│   │   │   ├── marketplace/
-│   │   │   │   ├── page.tsx          # Browse plugins
-│   │   │   │   └── [slug]/page.tsx   # Plugin detail
-│   │   │   ├── api-keys/page.tsx     # Manage API keys
-│   │   │   └── analytics/page.tsx    # Usage dashboard
-│   │   ├── api/
-│   │   │   ├── plugins/              # Plugin CRUD routes
-│   │   │   ├── knowledge/            # Document upload + processing
-│   │   │   ├── trees/                # Decision tree CRUD
-│   │   │   ├── v1/
-│   │   │   │   └── query/route.ts    # Main query endpoint (API key auth)
-│   │   │   ├── marketplace/          # Public marketplace
-│   │   │   ├── api-keys/             # API key management
-│   │   │   └── webhooks/
-│   │   │       └── clerk/route.ts    # Clerk user sync webhook
-│   │   ├── layout.tsx                # Wraps with <ClerkProvider>
-│   │   └── page.tsx                  # Landing page
-│   ├── middleware.ts                  # Clerk authMiddleware — protects (dashboard) routes
-│   ├── lib/
-│   │   ├── db/
-│   │   │   ├── index.ts              # Drizzle client (postgres-js driver)
-│   │   │   └── schema.ts             # All Drizzle table + relation definitions
-│   │   ├── auth.ts                   # requireUser() helper (Clerk → DB lookup)
-│   │   ├── supabase/
-│   │   │   └── storage.ts            # Supabase Storage client (file uploads only)
-│   │   ├── engine/
-│   │   │   ├── query-pipeline.ts     # Main query orchestrator
-│   │   │   ├── embedding.ts          # Vercel AI SDK embed() wrapper
-│   │   │   ├── retrieval.ts          # pgvector similarity search (via Drizzle sql``)
-│   │   │   ├── decision-tree.ts      # Tree execution engine
-│   │   │   ├── citation.ts           # Citation post-processor
-│   │   │   ├── hallucination-guard.ts # Confidence check + refusal
-│   │   │   └── chunker.ts            # Document text chunking
-│   │   ├── types/
-│   │   │   ├── plugin.ts
-│   │   │   ├── decision-tree.ts
-│   │   │   ├── query.ts
-│   │   │   └── citation.ts
-│   │   └── utils/
-│   │       ├── pdf-parser.ts         # PDF text extraction
-│   │       └── api-key.ts            # Key generation + hashing
-│   ├── components/
-│   │   ├── ui/                       # shadcn components
-│   │   ├── plugin-builder/
-│   │   │   ├── knowledge-uploader.tsx
-│   │   │   ├── tree-editor.tsx
-│   │   │   └── prompt-composer.tsx
-│   │   ├── sandbox/
-│   │   │   └── chat-interface.tsx
+├── app/                               # Next.js App Router (no src/ prefix)
+│   ├── layout.tsx                     # Root layout (<ClerkProvider>, fonts, Toaster)
+│   ├── page.tsx                       # Landing page
+│   ├── globals.css                    # Global styles
+│   ├── docs/page.tsx                  # Documentation page
+│   ├── (auth)/                        # Clerk auth pages
+│   │   ├── sign-in/[[...sign-in]]/page.tsx
+│   │   └── sign-up/[[...sign-up]]/page.tsx
+│   ├── (dashboard)/                   # Dashboard layout (sidebar nav, protected by Clerk)
+│   │   ├── layout.tsx                 # Sidebar with nav: Plugins, Marketplace, API Keys
+│   │   ├── plugins/
+│   │   │   ├── page.tsx               # Plugin list with search
+│   │   │   ├── plugins-grid.tsx       # Grid component (export JSON, etc.)
+│   │   │   ├── new/page.tsx           # Create plugin
+│   │   │   └── [id]/
+│   │   │       ├── page.tsx           # Plugin detail page
+│   │   │       ├── plugin-settings.tsx # Settings form
+│   │   │       ├── publish-button.tsx  # Publish/unpublish toggle
+│   │   │       ├── share-qr-button.tsx # QR code share button
+│   │   │       ├── knowledge/page.tsx  # Knowledge base management
+│   │   │       ├── trees/page.tsx      # Decision tree editor
+│   │   │       └── sandbox/page.tsx    # Streaming test sandbox
 │   │   ├── marketplace/
-│   │   │   ├── plugin-card.tsx
-│   │   │   └── plugin-grid.tsx
-│   │   └── shared/
-│   │       ├── citation-badge.tsx
-│   │       └── confidence-indicator.tsx
-│   └── store/
-│       └── tree-editor-store.ts      # Zustand store for decision tree editor
+│   │   │   ├── page.tsx               # Browse shared plugins
+│   │   │   └── [slug]/
+│   │   │       ├── page.tsx           # Plugin detail
+│   │   │       └── marketplace-actions.tsx  # Download/action buttons
+│   │   └── api-keys/page.tsx          # API key CRUD (create, reveal, revoke)
+│   └── api/
+│       ├── v1/query/route.ts          # Main query endpoint (API key auth, JSON + SSE streaming)
+│       ├── sandbox/[pluginId]/route.ts # Sandbox streaming endpoint (Clerk auth)
+│       ├── plugins/
+│       │   ├── route.ts               # GET (list), POST (create)
+│       │   └── [id]/
+│       │       ├── route.ts           # GET, PATCH, DELETE
+│       │       ├── export/route.ts    # Export plugin as JSON
+│       │       ├── documents/route.ts # Knowledge document CRUD + chunking
+│       │       └── trees/route.ts     # Decision tree CRUD
+│       ├── api-keys/route.ts          # GET, POST, PATCH (reveal), DELETE
+│       └── marketplace/[slug]/download/route.ts  # Download shared plugin
+├── middleware.ts                       # Clerk clerkMiddleware — protects /plugins, /api-keys, /api/plugins, /api/sandbox
+├── lib/
+│   ├── db/
+│   │   ├── index.ts                   # Drizzle client (postgres-js driver)
+│   │   └── schema.ts                  # Tables, types, relations (users, plugins, knowledge_documents, knowledge_chunks, decision_trees, api_keys, query_logs)
+│   ├── auth.ts                        # requireUser() — Clerk → DB user lookup with auto-create
+│   ├── utils.ts                       # cn() — clsx + tailwind-merge
+│   ├── utils/
+│   │   └── api-key.ts                 # generateApiKey(), hashApiKey(), encryptApiKey(), decryptApiKey()
+│   └── engine/
+│       ├── query-pipeline.ts          # runQueryPipeline() + streamQueryPipeline()
+│       ├── embedding.ts               # embedText() + embedTexts() via Vercel AI SDK
+│       ├── retrieval.ts               # pgvector cosine similarity (top-K=8, threshold=0.3)
+│       ├── chunker.ts                 # chunkText() — 1500-char chunks, 200-char overlap
+│       ├── decision-tree.ts           # executeDecisionTree() — JSON tree walker
+│       ├── citation.ts                # processCitations() — parse [Source N], map to docs, confidence
+│       └── hallucination-guard.ts     # applyHallucinationGuard() — refusal on low confidence
+├── components/
+│   ├── ui/                            # shadcn/ui components (button, input, textarea, label, dialog, dropdown-menu, select, tabs, badge, sonner, silk)
+│   └── silk-background.tsx            # Animated silk background
 ├── packages/
-│   └── sdk/                          # lexic-sdk (npm package)
+│   └── sdk/                           # lexic-sdk (npm package)
 │       ├── src/
-│       │   ├── index.ts              # Core SDK
-│       │   ├── langchain.ts          # LangChain adapter
-│       │   ├── autogpt.ts            # AutoGPT adapter
-│       │   └── types.ts
+│       │   ├── index.ts               # Core: Lexic class, query(), queryStream(), queryStreamToResult()
+│       │   ├── types.ts               # Shared types
+│       │   ├── langchain.ts           # LexicTool adapter
+│       │   ├── autogpt.ts             # LexicAutoGPT adapter
+│       │   └── __tests__/sdk.test.ts  # 69 unit tests
 │       ├── package.json
 │       └── tsconfig.json
-├── drizzle/
-│   └── migrations/                   # Generated by drizzle-kit + custom SQL
-│       ├── 0000_initial_schema.sql   # Auto-generated from schema.ts
-│       └── 0001_pgvector_index.sql   # Custom: CREATE EXTENSION vector + IVFFlat index
-├── drizzle.config.ts                 # Drizzle Kit configuration
-├── .env.local                        # All secrets
+├── drizzle.config.ts
+├── next.config.ts
 ├── package.json
-├── tsconfig.json
-├── tailwind.config.ts
-└── next.config.ts
+└── tsconfig.json
 ```
 
 ---
@@ -734,99 +766,73 @@ hackx/
 
 ```typescript
 // lib/engine/chunker.ts
-function chunkDocument(text: string, options: ChunkOptions): Chunk[] {
-  // Strategy: sliding window with overlap
-  const CHUNK_SIZE = 512;      // tokens
-  const OVERLAP = 64;          // token overlap between chunks
+const CHUNK_SIZE = 1500;  // characters (not tokens)
+const OVERLAP = 200;      // character overlap between chunks
 
-  // 1. Split by natural boundaries first (headings, paragraphs)
-  // 2. If a section > CHUNK_SIZE, apply sliding window
-  // 3. Preserve metadata: page number, section title, chunk index
-  // 4. Each chunk gets: { content, pageNumber, sectionTitle, chunkIndex }
+function chunkText(text: string, opts?: { fileName?: string; fileType?: string }): Chunk[] {
+  // 1. Split by double-newline (paragraph boundaries)
+  // 2. Accumulate into buffer until CHUNK_SIZE exceeded
+  // 3. On overflow: emit chunk, carry OVERLAP chars into next buffer
+  // 4. Extract section title from markdown headers or short first lines
+  // 5. Each chunk gets: { content, chunkIndex, sectionTitle?, metadata }
 }
 ```
 
-### 9.2 Hallucination Guard Prompt
+### 9.2 Hallucination Guard
 
-```typescript
-const HALLUCINATION_GUARD = `
-CRITICAL RULES:
-1. ONLY use information from the provided source documents.
-2. For EVERY factual claim, include an inline citation: [Source N].
-3. If the source documents do NOT contain information to answer the question,
-   respond EXACTLY: "I don't have verified information on this topic in my
-   knowledge base. Please consult a qualified professional."
-4. NEVER fabricate citations or reference documents not provided.
-5. If partially answerable, answer what you can with citations and clearly
-   state what you cannot verify.
-`;
-```
+The guard is a post-processing step (not a prompt), implemented in `lib/engine/hallucination-guard.ts`. It checks the citation engine's output and refuses if:
+
+1. **Zero real citations** — AI cited nothing from the knowledge base
+2. **Self-refusal detected** — short answer (<300 chars) containing phrases like "I don't have verified information" (long answers with standard disclaimers are NOT flagged)
+3. **Phantom majority** — more phantom [Source N] refs (pointing to nonexistent sources) than real refs
+
+The LLM prompt uses a "source priority" approach rather than strict refusal — it prioritizes knowledge base sources but may supplement with its own knowledge or web search when sources are insufficient. The guard catches cases where the AI fabricated citations or had no relevant sources.
 
 ### 9.3 Hot-Swap Implementation
 
+Plugins are stateless per-request, so hot-swapping is trivial — just change the slug:
+
 ```typescript
-// In the SDK — plugins are stateless per-request, so hot-swap is trivial
+// In the SDK — each request is independent, no state to tear down
 class Lexic {
-  private activePlugin: string;
+  private activePlugin: string | null;
 
   setActivePlugin(pluginSlug: string) {
-    this.activePlugin = pluginSlug; // next query uses this plugin
+    this.activePlugin = pluginSlug;
   }
 
   async query(opts: QueryOptions) {
     const plugin = opts.plugin || this.activePlugin;
-    // Each request is independent — no state to tear down
-    return fetch(`${this.baseUrl}/api/v1/query`, {
+    const body: Record<string, unknown> = { plugin, query: opts.query };
+    if (opts.context?.length) body.context = opts.context;
+    if (opts.options) body.options = opts.options;
+
+    const res = await fetch(`${this.baseUrl}/api/v1/query`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${this.apiKey}` },
-      body: JSON.stringify({ plugin, query: opts.query }),
-    }).then(r => r.json());
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+    // Response is normalized — missing fields get safe defaults
+    return normalizeQueryResult(await res.json());
   }
 }
 ```
 
+The LangChain and AutoGPT adapters also support hot-swap via `setPlugin()`:
+
+```typescript
+tool.setPlugin("hvac-design-v1");   // LexicTool (LangChain)
+adapter.setPlugin("hvac-design-v1"); // LexicAutoGPT
+```
+
 ---
 
-## 10. Hackathon Execution Plan
+## 10. Implementation Progress
 
-### Phase 1: Foundation (Hours 0-3)
-- [x] Initialize Next.js + TypeScript + Tailwind + shadcn/ui
-- [ ] Set up Clerk project (Google OAuth, configure sign-in/sign-up URLs)
-- [ ] Add Clerk middleware to protect `/dashboard/*` routes
-- [ ] Set up Supabase Postgres + Storage (DB + file uploads only, not auth)
-- [ ] Define Drizzle schema, run `drizzle-kit push` to create tables
-- [ ] Run custom migration for pgvector extension + IVFFlat index
-- [ ] Set up Clerk webhook → user sync to DB
-- [ ] Implement `requireUser()` auth helper
-
-### Phase 2: Core Engine (Hours 3-8)
-- [ ] PDF upload → text extraction → chunking → embedding pipeline
-- [ ] pgvector similarity search function
-- [ ] Decision tree JSON parser + runtime executor
-- [ ] Query pipeline orchestrator (embed → retrieve → tree → LLM → cite)
-- [ ] Hallucination guard + citation post-processor
-- [ ] `/api/v1/query` endpoint
-
-### Phase 3: Web App (Hours 8-14)
-- [ ] Plugin creation form (name, domain, system prompt)
-- [ ] Knowledge base upload UI (drag-and-drop PDFs)
-- [ ] Decision tree editor (JSON editor + preview)
-- [ ] Test sandbox (chat interface that hits the query API)
-- [ ] Plugin publish flow
-
-### Phase 4: Integration & Demo (Hours 14-18)
-- [ ] Build `lexic-sdk` with LangChain adapter
-- [ ] Create demo plugin: "Structural Engineering - IS 456"
-- [ ] Upload IS 456 relevant sections as knowledge base
-- [ ] Build decision tree for beam/column design checks
-- [ ] End-to-end demo: LangChain agent using the plugin
-- [ ] Marketplace browse page
-
-### Phase 5: Polish & Present (Hours 18-20)
-- [ ] Landing page with clear value prop
-- [ ] Demo video / live walkthrough script
-- [ ] Error handling and loading states
-- [ ] Deploy to Vercel
+See `PRD.md` section 5 for the detailed, up-to-date task checklist. The SPEC does not duplicate it.
 
 ---
 
@@ -836,14 +842,13 @@ class Lexic {
 # Clerk
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
-CLERK_WEBHOOK_SECRET=whsec_...
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 
 # Database (Supabase Postgres connection string — used by Drizzle)
 DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres
 
-# Supabase (Storage only — file uploads)
+# Supabase (used for Postgres connection; Storage integration removed)
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
@@ -851,35 +856,9 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 # OpenAI (read automatically by @ai-sdk/openai provider)
 OPENAI_API_KEY=sk-...
 
+# API key encryption (used by lib/utils/api-key.ts for AES-256-GCM)
+ENCRYPTION_KEY=...
+
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
----
-
-## 12. Third-Party Dependencies
-
-```json
-{
-  "dependencies": {
-    "next": "^14.2",
-    "@clerk/nextjs": "^5",
-    "svix": "^1.30",
-    "drizzle-orm": "^0.33",
-    "postgres": "^3.4",
-    "@supabase/supabase-js": "^2.45",
-    "ai": "^4",
-    "@ai-sdk/openai": "^1",
-    "pdf-parse": "^1.1",
-    "zustand": "^4.5",
-    "zod": "^3.23",
-    "tailwindcss": "^3.4",
-    "@radix-ui/react-*": "latest",
-    "class-variance-authority": "^0.7",
-    "lucide-react": "^0.400"
-  },
-  "devDependencies": {
-    "drizzle-kit": "^0.24"
-  }
-}
 ```

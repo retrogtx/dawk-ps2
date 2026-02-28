@@ -78,6 +78,7 @@ export async function runQueryPipeline(
   query: string,
   apiKeyId?: string,
   options?: QueryPipelineOptions,
+  context?: Array<{ role: "user" | "assistant"; content: string }>,
 ): Promise<QueryResult> {
   const start = Date.now();
 
@@ -117,19 +118,21 @@ export async function runQueryPipeline(
 
   // 5. LLM generation (GPT-5 with web search for supplementary info)
   const systemPrompt = `${plugin.systemPrompt}\n\n${SOURCE_PRIORITY_PROMPT}`;
-  const userMessage = `
-Source Documents:
-${sourceContext || "No relevant sources found."}
-${decisionContext}
+  const contextPreamble = `Source Documents:\n${sourceContext || "No relevant sources found."}\n${decisionContext}\n\nAnswer the question. Prioritise the source documents above and cite them with [Source N]. You may supplement with your own knowledge or web search if needed.`;
 
-User Question: ${query}
+  const priorMessages: Array<{ role: "user" | "assistant"; content: string }> =
+    Array.isArray(context) ? context.filter((m) => m.content?.trim()) : [];
 
-Answer the question. Prioritise the source documents above and cite them with [Source N]. You may supplement with your own knowledge or web search if needed.`;
+  const llmMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
+    { role: "user", content: contextPreamble },
+    ...priorMessages,
+    { role: "user", content: query },
+  ];
 
   const { text } = await generateText({
     model: openai("gpt-5"),
     system: systemPrompt,
-    prompt: userMessage,
+    messages: llmMessages,
     tools: {
       web_search: openai.tools.webSearch({ searchContextSize: "medium" }),
     },
@@ -237,7 +240,8 @@ export async function streamQueryPipeline(
   pluginSlug: string,
   query: string,
   apiKeyId?: string,
-  options?: { skipPublishCheck?: boolean; skipAuditLog?: boolean },
+  options?: QueryPipelineOptions,
+  context?: Array<{ role: "user" | "assistant"; content: string }>,
 ): Promise<ReadableStream<Uint8Array>> {
   const start = Date.now();
   const encoder = new TextEncoder();
@@ -290,19 +294,21 @@ export async function streamQueryPipeline(
           : "";
 
         const systemPrompt = `${plugin.systemPrompt}\n\n${SOURCE_PRIORITY_PROMPT}`;
-        const userMessage = `
-Source Documents:
-${sourceContext || "No relevant sources found."}
-${decisionContext}
+        const contextPreamble = `Source Documents:\n${sourceContext || "No relevant sources found."}\n${decisionContext}\n\nAnswer the question. Prioritise the source documents above and cite them with [Source N]. You may supplement with your own knowledge or web search if needed.`;
 
-User Question: ${query}
+        const priorMessages: Array<{ role: "user" | "assistant"; content: string }> =
+          Array.isArray(context) ? context.filter((m) => m.content?.trim()) : [];
 
-Answer the question. Prioritise the source documents above and cite them with [Source N]. You may supplement with your own knowledge or web search if needed.`;
+        const llmMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
+          { role: "user", content: contextPreamble },
+          ...priorMessages,
+          { role: "user", content: query },
+        ];
 
         const result = streamText({
           model: openai("gpt-5"),
           system: systemPrompt,
-          prompt: userMessage,
+          messages: llmMessages,
           tools: {
             web_search: openai.tools.webSearch({ searchContextSize: "medium" }),
           },
