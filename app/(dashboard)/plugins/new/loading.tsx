@@ -1,0 +1,5 @@
+import { DashboardFormSkeleton } from "@/components/page-skeletons";
+
+export default function Loading() {
+  return <DashboardFormSkeleton />;
+}

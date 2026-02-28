@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Upload, FileText, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,12 +24,17 @@ export default function KnowledgeBasePage() {
   const params = useParams();
   const pluginId = params.id as string;
   const [docs, setDocs] = useState<Document[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
   const loadDocs = useCallback(async () => {
-    const res = await fetch(`/api/plugins/${pluginId}/documents`);
-    if (res.ok) setDocs(await res.json());
+    try {
+      const res = await fetch(`/api/plugins/${pluginId}/documents`);
+      if (res.ok) setDocs(await res.json());
+    } finally {
+      setInitialLoading(false);
+    }
   }, [pluginId]);
 
   useEffect(() => {
@@ -235,7 +241,22 @@ export default function KnowledgeBasePage() {
             </p>
           </div>
           <div className="p-6">
-            {docs.length === 0 ? (
+            {initialLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-lg border border-[#262626] bg-[#111111] p-3"
+                  >
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-44" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                    <Skeleton className="h-8 w-8" />
+                  </div>
+                ))}
+              </div>
+            ) : docs.length === 0 ? (
               <div className="flex flex-col items-center py-8 text-center">
                 <FileText className="mb-3 h-10 w-10 text-[#333]" />
                 <p className="text-sm text-[#a1a1a1]">

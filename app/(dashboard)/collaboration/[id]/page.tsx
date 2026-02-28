@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
   Send,
@@ -97,6 +98,7 @@ export default function CollaborationRoomPage() {
   const params = useParams();
   const roomId = params.id as string;
   const [room, setRoom] = useState<RoomInfo | null>(null);
+  const [roomLoading, setRoomLoading] = useState(true);
   const [input, setInput] = useState("");
   const [phase, setPhase] = useState<StreamPhase>("idle");
   const [experts, setExperts] = useState<ExpertInfo[]>([]);
@@ -110,11 +112,16 @@ export default function CollaborationRoomPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadRoom = useCallback(async () => {
-    const res = await fetch(`/api/collaboration-rooms/${roomId}`);
-    if (res.ok) {
-      const data = await res.json();
-      setRoom(data);
-      setExperts(data.expertDetails || []);
+    setRoomLoading(true);
+    try {
+      const res = await fetch(`/api/collaboration-rooms/${roomId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRoom(data);
+        setExperts(data.expertDetails || []);
+      }
+    } finally {
+      setRoomLoading(false);
     }
   }, [roomId]);
 
@@ -246,6 +253,30 @@ export default function CollaborationRoomPage() {
   }
 
   const isActive = phase === "deliberating" || phase === "synthesizing" || phase === "resolving";
+
+  if (roomLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-5 w-36" />
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-72" />
+          <Skeleton className="h-4 w-96" />
+          <div className="flex gap-2">
+            <Skeleton className="h-5 w-20" />
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+        </div>
+        <div className="rounded-md border border-[#262626] bg-[#0a0a0a] p-4">
+          <Skeleton className="h-[58vh] w-full" />
+          <div className="mt-4 flex gap-2">
+            <Skeleton className="h-10 flex-1" />
+            <Skeleton className="h-10 w-20" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">

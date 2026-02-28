@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
   Send,
@@ -95,14 +96,20 @@ export default function SandboxPage() {
   const params = useParams();
   const pluginId = params.id as string;
   const [plugin, setPlugin] = useState<PluginInfo | null>(null);
+  const [pluginLoading, setPluginLoading] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadPlugin = useCallback(async () => {
-    const res = await fetch(`/api/plugins/${pluginId}`);
-    if (res.ok) setPlugin(await res.json());
+    setPluginLoading(true);
+    try {
+      const res = await fetch(`/api/plugins/${pluginId}`);
+      if (res.ok) setPlugin(await res.json());
+    } finally {
+      setPluginLoading(false);
+    }
   }, [pluginId]);
 
   useEffect(() => {
@@ -265,6 +272,25 @@ export default function SandboxPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (pluginLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-5 w-36" />
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-56" />
+          <Skeleton className="h-4 w-80" />
+        </div>
+        <div className="rounded-md border border-[#262626] bg-[#0a0a0a] p-4">
+          <Skeleton className="h-[58vh] w-full" />
+          <div className="mt-4 flex gap-2">
+            <Skeleton className="h-10 flex-1" />
+            <Skeleton className="h-10 w-14" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
