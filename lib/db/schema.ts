@@ -23,7 +23,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// ─── SME Plugins ────────────────────────────────────────────────────
+// ─── Plugins ────────────────────────────────────────────────────────
 
 export const plugins = pgTable("plugins", {
   id: uuid("id").primaryKey().defaultRandom(),

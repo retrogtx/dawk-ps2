@@ -21,6 +21,7 @@ export default function ApiKeysPage() {
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
 
   const loadKeys = useCallback(async () => {
@@ -36,6 +37,7 @@ export default function ApiKeysPage() {
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     const form = new FormData(e.currentTarget);
     const name = form.get("name") as string;
 
@@ -50,7 +52,11 @@ export default function ApiKeysPage() {
         setNewKey(data.key);
         setCreating(false);
         await loadKeys();
+      } else {
+        setError(data.error || "Failed to create API key");
       }
+    } catch {
+      setError("Network error — failed to create API key");
     } finally {
       setLoading(false);
     }
@@ -116,6 +122,12 @@ export default function ApiKeysPage() {
               )}
             </Button>
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-6 rounded-md border border-[#ff4444]/30 bg-[#ff4444]/5 p-4">
+          <p className="text-sm text-[#ff4444]">{error}</p>
         </div>
       )}
 
