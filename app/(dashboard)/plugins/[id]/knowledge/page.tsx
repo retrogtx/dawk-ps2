@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Upload, FileText, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Document {
@@ -84,11 +85,35 @@ export default function KnowledgeBasePage() {
     }
   }
 
-  async function handleDelete(docId: string) {
-    await fetch(`/api/plugins/${pluginId}/documents?docId=${docId}`, {
-      method: "DELETE",
+  function handleDelete(docId: string, docName: string) {
+    toast("Delete this document?", {
+      description: "This will remove all its chunks and embeddings. This cannot be undone.",
+      action: {
+        label: "Delete",
+        onClick: () => performDelete(docId, docName),
+      },
+      cancel: {
+        label: "Cancel",
+        onClick: () => {},
+      },
+      duration: 10000,
     });
-    await loadDocs();
+  }
+
+  async function performDelete(docId: string, docName: string) {
+    try {
+      const res = await fetch(`/api/plugins/${pluginId}/documents?docId=${docId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to delete document");
+      }
+      await loadDocs();
+      toast.success(`Deleted "${docName}"`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete document");
+    }
   }
 
   return (
@@ -236,7 +261,7 @@ export default function KnowledgeBasePage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(doc.id)}
+                      onClick={() => handleDelete(doc.id, doc.fileName)}
                       className="text-[#666] hover:text-[#ff4444] hover:bg-[#ff4444]/10"
                     >
                       <Trash2 className="h-4 w-4" />

@@ -27,17 +27,34 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  let user;
   try {
-    const user = await requireUser();
-    const body = await req.json();
-    const { name } = body;
+    user = await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-    if (!name) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
-    }
+  let body: { name?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
-    const { key, hash, prefix, encrypted } = generateApiKey();
+  const { name } = body;
+  if (!name) {
+    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
 
+  let key: string, hash: string, prefix: string, encrypted: string;
+  try {
+    ({ key, hash, prefix, encrypted } = generateApiKey());
+  } catch (error) {
+    console.error("generateApiKey error:", error);
+    return NextResponse.json({ error: "Failed to generate key" }, { status: 500 });
+  }
+
+  try {
     await db.insert(apiKeys).values({
       userId: user.id,
       keyHash: hash,
@@ -45,12 +62,12 @@ export async function POST(req: NextRequest) {
       keyEncrypted: encrypted,
       name,
     });
-
-    return NextResponse.json({ key, prefix, name }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("DB insert error:", error);
+    return NextResponse.json({ error: "Failed to save key" }, { status: 500 });
   }
+
+  return NextResponse.json({ key, prefix, name }, { status: 201 });
 }
 
 export async function PATCH(req: NextRequest) {

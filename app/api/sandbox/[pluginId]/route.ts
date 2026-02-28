@@ -3,10 +3,10 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { plugins } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { runQueryPipeline } from "@/lib/engine/query-pipeline";
+import { streamQueryPipeline } from "@/lib/engine/query-pipeline";
 
 // Sandbox route — uses Clerk auth instead of API key auth
-// Allows plugin owners to test their plugins before publishing
+// Allows plugin owners to test their plugins before publishing.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ pluginId: string }> },
@@ -15,7 +15,6 @@ export async function POST(
     const user = await requireUser();
     const { pluginId } = await params;
 
-    // Verify the user owns this plugin
     const plugin = await db.query.plugins.findFirst({
       where: and(eq(plugins.id, pluginId), eq(plugins.creatorId, user.id)),
     });
@@ -25,91 +24,29 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { query } = body;
+    const { query, history } = body as {
+      query?: string;
+      history?: Array<{ role: "user" | "assistant"; content: string }>;
+    };
 
     if (!query) {
       return NextResponse.json({ error: "Missing query" }, { status: 400 });
     }
 
-    // For sandbox, we temporarily allow unpublished plugins by querying directly
-    // We modify the pipeline call to use slug (which works for both published/unpublished in sandbox)
-    const result = await runSandboxQuery(plugin, query);
+    const stream = await streamQueryPipeline(plugin.slug, query, undefined, {
+      skipPublishCheck: true,
+      skipAuditLog: true,
+    }, history);
 
-    return NextResponse.json(result);
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
-
-// Simplified sandbox query that bypasses the "isPublished" check
-async function runSandboxQuery(
-  plugin: typeof plugins.$inferSelect,
-  query: string,
-) {
-  const { generateText } = await import("ai");
-  const { openai } = await import("@ai-sdk/openai");
-  const { retrieveSources } = await import("@/lib/engine/retrieval");
-  const { processCitations } = await import("@/lib/engine/citation");
-  const { applyHallucinationGuard } = await import("@/lib/engine/hallucination-guard");
-  const { executeDecisionTree } = await import("@/lib/engine/decision-tree");
-  const { decisionTrees } = await import("@/lib/db/schema");
-  const { eq: eqOp, and: andOp } = await import("drizzle-orm");
-
-  // Retrieve sources
-  const sources = await retrieveSources(query, plugin.id);
-
-  // Decision trees
-  const activeTrees = await db.query.decisionTrees.findMany({
-    where: andOp(eqOp(decisionTrees.pluginId, plugin.id), eqOp(decisionTrees.isActive, true)),
-  });
-
-  let decisionResult = null;
-  if (activeTrees.length > 0) {
-    const params: Record<string, string> = {};
-    // Simple extraction
-    const memberMatch = query.match(/\b(beam|column|slab|footing)\b/i);
-    if (memberMatch) params.member_type = memberMatch[1].toLowerCase();
-    const exposureMatch = query.match(/\b(mild|moderate|severe|extreme)\b/i);
-    if (exposureMatch) params.exposure = exposureMatch[1].toLowerCase();
-
-    decisionResult = executeDecisionTree(activeTrees[0].treeData, params);
-  }
-
-  // Build LLM prompt
-  const sourceContext = sources
-    .map((s, i) => `[Source ${i + 1}] (${s.documentName}${s.sectionTitle ? `, ${s.sectionTitle}` : ""})\n${s.content}`)
-    .join("\n\n---\n\n");
-
-  const decisionContext = decisionResult
-    ? `\nDecision Tree Analysis:\n${decisionResult.path.map((s) => `- ${s.label}: ${s.answer || s.result || (s.action?.recommendation ?? "")}`).join("\n")}`
-    : "";
-
-  const GUARD = `
-CRITICAL RULES:
-1. ONLY use information from the provided source documents.
-2. For EVERY factual claim, include an inline citation: [Source N].
-3. If no sources are provided or they don't cover the question, say "I don't have verified information on this topic."
-4. NEVER fabricate citations.`;
-
-  const { text } = await generateText({
-    model: openai("gpt-4o"),
-    system: `${plugin.systemPrompt}\n${GUARD}`,
-    prompt: `Source Documents:\n${sourceContext || "No relevant sources found."}\n${decisionContext}\n\nUser Question: ${query}\n\nRespond using the source documents. Cite every claim with [Source N].`,
-  });
-
-  const citationResult = processCitations(text, sources);
-  const guarded = applyHallucinationGuard(citationResult);
-
-  return {
-    answer: guarded.cleanedAnswer,
-    citations: guarded.citations,
-    confidence: guarded.confidence,
-    decisionPath: decisionResult?.path.map((s, i) => ({
-      step: i + 1,
-      label: s.label,
-      value: s.answer,
-      result: s.action?.recommendation,
-    })) || [],
-  };
 }

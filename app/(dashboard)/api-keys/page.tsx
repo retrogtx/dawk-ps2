@@ -4,8 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Key, Plus, Trash2, Copy, Check } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Key, Plus, Trash2, Copy, Check, AlertTriangle } from "lucide-react";
 
 interface ApiKeyInfo {
   id: string;
@@ -21,7 +28,10 @@ export default function ApiKeysPage() {
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<ApiKeyInfo | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadKeys = useCallback(async () => {
     const res = await fetch("/api/api-keys");
@@ -36,6 +46,7 @@ export default function ApiKeysPage() {
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     const form = new FormData(e.currentTarget);
     const name = form.get("name") as string;
 
@@ -50,22 +61,47 @@ export default function ApiKeysPage() {
         setNewKey(data.key);
         setCreating(false);
         await loadKeys();
+      } else {
+        setError(data.error || "Failed to create API key");
       }
+    } catch {
+      setError("Network error — failed to create API key");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id: string) {
-    await fetch(`/api/api-keys?id=${id}`, { method: "DELETE" });
-    await loadKeys();
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/api-keys?id=${deleteTarget.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Failed to delete API key");
+      }
+      setDeleteTarget(null);
+      await loadKeys();
+    } catch (err) {
+      setDeleteTarget(null);
+      setError(err instanceof Error ? err.message : "Failed to delete API key");
+    } finally {
+      setDeleting(false);
+    }
   }
 
-  function copyKey() {
+  async function copyKey() {
     if (newKey) {
-      navigator.clipboard.writeText(newKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      try {
+        await navigator.clipboard.writeText(newKey);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        alert("Failed to copy — please select and copy the key manually");
+      }
     }
   }
 
@@ -78,7 +114,13 @@ export default function ApiKeysPage() {
             Manage keys for external agents to query your plugins
           </p>
         </div>
-        <Button onClick={() => { setCreating(true); setNewKey(null); }} className="bg-white text-black hover:bg-[#ccc] font-semibold">
+        <Button
+          onClick={() => {
+            setCreating(true);
+            setNewKey(null);
+          }}
+          className="bg-white text-black hover:bg-[#ccc] font-semibold"
+        >
           <Plus className="mr-2 h-4 w-4" />
           New Key
         </Button>
@@ -93,7 +135,12 @@ export default function ApiKeysPage() {
             <code className="flex-1 rounded-lg border border-[#262626] bg-[#111111] px-3 py-2 text-sm text-white">
               {newKey}
             </code>
-            <Button size="sm" variant="outline" onClick={copyKey} className="border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={copyKey}
+              className="border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white"
+            >
               {copied ? (
                 <Check className="h-4 w-4 text-[#00d4aa]" />
               ) : (
@@ -104,18 +151,27 @@ export default function ApiKeysPage() {
         </div>
       )}
 
+      {error && (
+        <div className="mb-6 rounded-md border border-[#ff4444]/30 bg-[#ff4444]/5 p-4">
+          <p className="text-sm text-[#ff4444]">{error}</p>
+        </div>
+      )}
+
       {creating && (
         <div className="mb-6 rounded-md border border-[#262626] bg-[#0a0a0a]">
           <div className="border-b border-[#262626] p-6">
             <h2 className="font-bold text-white">Create API Key</h2>
             <p className="mt-1 text-sm text-[#a1a1a1]">
-              Give your key a descriptive name to remember what it&apos;s used for.
+              Give your key a descriptive name to remember what it&apos;s used
+              for.
             </p>
           </div>
           <div className="p-6">
             <form onSubmit={handleCreate} className="flex items-end gap-3">
               <div className="flex-1 space-y-2">
-                <Label htmlFor="keyName" className="text-[#ededed]">Key Name</Label>
+                <Label htmlFor="keyName" className="text-[#ededed]">
+                  Key Name
+                </Label>
                 <Input
                   id="keyName"
                   name="name"
@@ -124,7 +180,11 @@ export default function ApiKeysPage() {
                   className="border-[#262626] bg-[#111111] text-white placeholder:text-[#555] focus:border-[#444] focus:ring-0"
                 />
               </div>
-              <Button type="submit" disabled={loading} className="bg-white text-black hover:bg-[#ccc] font-semibold">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="bg-white text-black hover:bg-[#ccc] font-semibold"
+              >
                 {loading ? "Creating..." : "Create"}
               </Button>
               <Button
@@ -148,9 +208,13 @@ export default function ApiKeysPage() {
         <div className="flex flex-col items-center rounded-md border border-dashed border-[#333] py-16">
           <Key className="mb-3 h-10 w-10 text-[#333]" />
           <p className="mb-4 text-sm text-[#a1a1a1]">
-            No API keys yet. Create one to let external agents query your plugins.
+            No API keys yet. Create one to let external agents query your
+            plugins.
           </p>
-          <Button onClick={() => setCreating(true)} className="bg-white text-black hover:bg-[#ccc] font-semibold">
+          <Button
+            onClick={() => setCreating(true)}
+            className="bg-white text-black hover:bg-[#ccc] font-semibold"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Create First Key
           </Button>
@@ -158,7 +222,10 @@ export default function ApiKeysPage() {
       ) : (
         <div className="space-y-2">
           {keys.map((k) => (
-            <div key={k.id} className="flex items-center justify-between rounded-md border border-[#262626] bg-[#0a0a0a] p-4 transition-colors hover:border-[#333]">
+            <div
+              key={k.id}
+              className="flex items-center justify-between rounded-md border border-[#262626] bg-[#0a0a0a] p-4 transition-colors hover:border-[#333]"
+            >
               <div className="flex items-center gap-3">
                 <Key className="h-5 w-5 text-[#666]" />
                 <div>
@@ -167,8 +234,7 @@ export default function ApiKeysPage() {
                     <code className="text-[#888]">{k.keyPrefix}...</code>
                     {k.lastUsedAt && (
                       <span>
-                        Last used{" "}
-                        {new Date(k.lastUsedAt).toLocaleDateString()}
+                        Last used {new Date(k.lastUsedAt).toLocaleDateString()}
                       </span>
                     )}
                   </div>
@@ -177,7 +243,7 @@ export default function ApiKeysPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleDelete(k.id)}
+                onClick={() => setDeleteTarget(k)}
                 className="text-[#666] hover:text-[#ff4444] hover:bg-[#ff4444]/10"
               >
                 <Trash2 className="h-4 w-4" />
@@ -187,24 +253,248 @@ export default function ApiKeysPage() {
         </div>
       )}
 
-      <div className="mt-8 rounded-md border border-[#262626] bg-[#0a0a0a]">
-        <div className="border-b border-[#262626] p-6">
+      <ApiUsageExample />
+
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="border-[#262626] bg-[#0a0a0a] sm:max-w-[400px]"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-white">Delete API Key</DialogTitle>
+            <DialogDescription className="text-[#a1a1a1]">
+              This will permanently delete{" "}
+              <span className="font-medium text-white">
+                {deleteTarget?.name}
+              </span>{" "}
+              and revoke all access. Any agents using this key will immediately
+              stop working.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="w-fit rounded-md border border-[#ff4444]/20 bg-[#ff4444]/5 px-3 py-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#ff4444]" />
+              <p className="text-sm text-[#ff4444]">
+                This action cannot be undone.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+              className="border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-[#ff4444] text-white hover:bg-[#e03c3c] font-semibold"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ApiUsageExample() {
+  const [mode, setMode] = useState<"stream" | "json">("stream");
+  const [lang, setLang] = useState<"curl" | "typescript" | "python">("curl");
+  const [copied, setCopied] = useState(false);
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+  const key = "lx_your_key_here";
+  const plug = "your-plugin-slug";
+
+  function getSnippet() {
+    if (lang === "typescript") {
+      if (mode === "stream") {
+        return `import { Lexic } from "lexic-sdk";
+
+const lexic = new Lexic({
+  apiKey: "${key}",
+  baseUrl: "${baseUrl}",
+});
+
+for await (const event of lexic.queryStream({
+  plugin: "${plug}",
+  query: "Your question here",
+})) {
+  switch (event.type) {
+    case "status":
+      console.log(\`[\${event.status}] \${event.message}\`);
+      break;
+    case "delta":
+      process.stdout.write(event.text);
+      break;
+    case "done":
+      console.log("\\nCitations:", event.citations);
+      console.log("Confidence:", event.confidence);
+      break;
+  }
+}`;
+      }
+      return `import { Lexic } from "lexic-sdk";
+
+const lexic = new Lexic({
+  apiKey: "${key}",
+  baseUrl: "${baseUrl}",
+});
+
+const result = await lexic.query({
+  plugin: "${plug}",
+  query: "Your question here",
+});
+
+console.log(result.answer);
+console.log(result.citations);
+console.log(result.confidence);`;
+    }
+
+    if (lang === "python") {
+      if (mode === "stream") {
+        return `import requests, json
+
+resp = requests.post(
+    "${baseUrl}/api/v1/query",
+    headers={
+        "Authorization": "Bearer ${key}",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+    },
+    json={"plugin": "${plug}", "query": "Your question here", "stream": True},
+    stream=True,
+)
+
+for line in resp.iter_lines():
+    if line and line.startswith(b"data: "):
+        event = json.loads(line[6:])
+        if event["type"] == "status":
+            print(f"[{event['status']}] {event['message']}")
+        elif event["type"] == "delta":
+            print(event["text"], end="", flush=True)
+        elif event["type"] == "done":
+            print(f"\\nCitations: {event['citations']}")`;
+      }
+      return `import requests
+
+resp = requests.post(
+    "${baseUrl}/api/v1/query",
+    headers={
+        "Authorization": "Bearer ${key}",
+        "Content-Type": "application/json",
+    },
+    json={"plugin": "${plug}", "query": "Your question here"},
+)
+
+data = resp.json()
+print(data["answer"])
+print(data["citations"])
+print(data["confidence"])`;
+    }
+
+    if (mode === "stream") {
+      return `curl -N -X POST ${baseUrl}/api/v1/query \\
+  -H "Authorization: Bearer ${key}" \\
+  -H "Content-Type: application/json" \\
+  -H "Accept: text/event-stream" \\
+  -d '{
+    "plugin": "${plug}",
+    "query": "Your question here",
+    "stream": true
+  }'`;
+    }
+    return `curl -X POST ${baseUrl}/api/v1/query \\
+  -H "Authorization: Bearer ${key}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "plugin": "${plug}",
+    "query": "Your question here"
+  }'`;
+  }
+
+  function copySnippet() {
+    navigator.clipboard.writeText(getSnippet());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="mt-8 rounded-md border border-[#262626] bg-[#0a0a0a]">
+      <div className="flex items-center justify-between border-b border-[#262626] p-6">
+        <div>
           <h2 className="font-bold text-white">Usage Example</h2>
           <p className="mt-1 text-sm text-[#a1a1a1]">
             Use your API key to query any published plugin
           </p>
         </div>
-        <div className="p-6">
-          <pre className="overflow-x-auto rounded-lg border border-[#262626] bg-[#111111] p-4 text-sm text-[#ededed]">
-{`curl -X POST /api/v1/query \\
-  -H "Authorization: Bearer lx_your_key_here" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "plugin": "your-plugin-slug",
-    "query": "Your question here"
-  }'`}
-          </pre>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={copySnippet}
+          className="border-[#333] text-[#a1a1a1] hover:bg-[#1a1a1a] hover:text-white"
+        >
+          {copied ? (
+            <>
+              <Check className="mr-1.5 h-3 w-3 text-[#00d4aa]" />
+              Copied
+            </>
+          ) : (
+            <>
+              <Copy className="mr-1.5 h-3 w-3" />
+              Copy
+            </>
+          )}
+        </Button>
+      </div>
+      <div className="p-6 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 rounded-md border border-[#262626] bg-[#111111] p-0.5">
+            {(["curl", "typescript", "python"] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setLang(l)}
+                className={`rounded px-3 py-1 text-xs font-medium transition-colors ${lang === l ? "bg-[#262626] text-white" : "text-[#666] hover:text-[#a1a1a1]"}`}
+              >
+                {l === "curl" ? "cURL" : l === "typescript" ? "TypeScript" : "Python"}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1 rounded-md border border-[#262626] bg-[#111111] p-0.5">
+            <button
+              type="button"
+              onClick={() => setMode("stream")}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${mode === "stream" ? "bg-[#00d4aa]/20 text-[#00d4aa]" : "text-[#666] hover:text-[#a1a1a1]"}`}
+            >
+              Streaming
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("json")}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${mode === "json" ? "bg-[#262626] text-white" : "text-[#666] hover:text-[#a1a1a1]"}`}
+            >
+              JSON
+            </button>
+          </div>
         </div>
+        <pre className="overflow-x-auto rounded-lg border border-[#262626] bg-[#111111] p-4 text-sm text-[#ededed]">
+          {getSnippet()}
+        </pre>
+        {mode === "stream" && (
+          <p className="text-xs text-[#555]">
+            Streaming returns real-time status updates ({'"searching_kb"'}, {'"web_search"'}, {'"generating"'}), text tokens, and final citations.
+          </p>
+        )}
       </div>
     </div>
   );
