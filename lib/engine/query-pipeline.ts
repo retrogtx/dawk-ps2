@@ -3,7 +3,7 @@ import { openai } from "@ai-sdk/openai";
 import { db } from "@/lib/db";
 import { plugins, decisionTrees, queryLogs } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { retrieveSources, type RetrievedChunk } from "./retrieval";
+import { retrieveSources } from "./retrieval";
 import { executeDecisionTree, type DecisionResult } from "./decision-tree";
 import { processCitations } from "./citation";
 import { applyHallucinationGuard } from "./hallucination-guard";
@@ -44,6 +44,7 @@ export async function runQueryPipeline(
   query: string,
   apiKeyId?: string,
   options?: { skipPublishCheck?: boolean },
+  context?: Array<{ role: "user" | "assistant"; content: string }>,
 ): Promise<QueryResult> {
   const start = Date.now();
 
@@ -83,19 +84,21 @@ export async function runQueryPipeline(
 
   // 5. LLM generation (GPT-5 with web search for supplementary info)
   const systemPrompt = `${plugin.systemPrompt}\n\n${SOURCE_PRIORITY_PROMPT}`;
-  const userMessage = `
-Source Documents:
-${sourceContext || "No relevant sources found."}
-${decisionContext}
+  const contextPreamble = `Source Documents:\n${sourceContext || "No relevant sources found."}\n${decisionContext}\n\nAnswer the question. Prioritise the source documents above and cite them with [Source N]. You may supplement with your own knowledge or web search if needed.`;
 
-User Question: ${query}
+  const priorMessages: Array<{ role: "user" | "assistant"; content: string }> =
+    Array.isArray(context) ? context.filter((m) => m.content?.trim()) : [];
 
-Answer the question. Prioritise the source documents above and cite them with [Source N]. You may supplement with your own knowledge or web search if needed.`;
+  const llmMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
+    { role: "user", content: contextPreamble },
+    ...priorMessages,
+    { role: "user", content: query },
+  ];
 
   const { text } = await generateText({
     model: openai("gpt-5"),
     system: systemPrompt,
-    prompt: userMessage,
+    messages: llmMessages,
     tools: {
       web_search: openai.tools.webSearch({ searchContextSize: "medium" }),
     },
@@ -145,6 +148,7 @@ export async function streamQueryPipeline(
   query: string,
   apiKeyId?: string,
   options?: { skipPublishCheck?: boolean },
+  context?: Array<{ role: "user" | "assistant"; content: string }>,
 ): Promise<ReadableStream<Uint8Array>> {
   const start = Date.now();
   const encoder = new TextEncoder();
@@ -197,19 +201,21 @@ export async function streamQueryPipeline(
           : "";
 
         const systemPrompt = `${plugin.systemPrompt}\n\n${SOURCE_PRIORITY_PROMPT}`;
-        const userMessage = `
-Source Documents:
-${sourceContext || "No relevant sources found."}
-${decisionContext}
+        const contextPreamble = `Source Documents:\n${sourceContext || "No relevant sources found."}\n${decisionContext}\n\nAnswer the question. Prioritise the source documents above and cite them with [Source N]. You may supplement with your own knowledge or web search if needed.`;
 
-User Question: ${query}
+        const priorMessages: Array<{ role: "user" | "assistant"; content: string }> =
+          Array.isArray(context) ? context.filter((m) => m.content?.trim()) : [];
 
-Answer the question. Prioritise the source documents above and cite them with [Source N]. You may supplement with your own knowledge or web search if needed.`;
+        const llmMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
+          { role: "user", content: contextPreamble },
+          ...priorMessages,
+          { role: "user", content: query },
+        ];
 
         const result = streamText({
           model: openai("gpt-5"),
           system: systemPrompt,
-          prompt: userMessage,
+          messages: llmMessages,
           tools: {
             web_search: openai.tools.webSearch({ searchContextSize: "medium" }),
           },
@@ -255,6 +261,7 @@ Answer the question. Prioritise the source documents above and cite them with [S
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           type: "done",
+          answer: guardedResult.cleanedAnswer,
           citations: guardedResult.citations,
           decisionPath,
           confidence: guardedResult.confidence,
@@ -275,7 +282,6 @@ Answer the question. Prioritise the source documents above and cite them with [S
 function extractQueryParams(query: string): Record<string, string> {
   // Simple extraction — the LLM-backed version would be smarter
   const params: Record<string, string> = {};
-  const lowerQuery = query.toLowerCase();
 
   // Common engineering parameters
   const patterns: Record<string, RegExp> = {

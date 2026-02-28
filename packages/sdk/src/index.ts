@@ -4,12 +4,57 @@ import type {
   QueryResult,
   LexicError,
   StreamEvent,
+  Citation,
+  DecisionStep,
 } from "./types";
 
-export type { LexicConfig, QueryOptions, QueryResult, Citation, DecisionStep, LexicError, StreamEvent } from "./types";
+export type { LexicConfig, QueryOptions, QueryRequestOptions, QueryResult, Citation, DecisionStep, LexicError, StreamEvent } from "./types";
 
 const DEFAULT_BASE_URL = "https://dawk-ps2.vercel.app";
 const DEFAULT_TIMEOUT = 120_000;
+
+/**
+ * Normalize a raw API response into a well-typed QueryResult.
+ * Handles missing fields, wrong types, and unexpected shapes so callers
+ * always get a predictable object regardless of API version quirks.
+ */
+function normalizeQueryResult(raw: Record<string, unknown>): QueryResult {
+  return {
+    answer: typeof raw.answer === "string" ? raw.answer : "",
+    citations: Array.isArray(raw.citations)
+      ? (raw.citations as Record<string, unknown>[]).map(normalizeCitation)
+      : [],
+    decisionPath: Array.isArray(raw.decisionPath)
+      ? (raw.decisionPath as Record<string, unknown>[]).map(normalizeDecisionStep)
+      : [],
+    confidence: isConfidence(raw.confidence) ? raw.confidence : "low",
+    pluginVersion: typeof raw.pluginVersion === "string" ? raw.pluginVersion : "unknown",
+  };
+}
+
+function normalizeCitation(raw: Record<string, unknown>): Citation {
+  return {
+    id: typeof raw.id === "string" ? raw.id : "",
+    document: typeof raw.document === "string" ? raw.document : "",
+    page: typeof raw.page === "number" ? raw.page : undefined,
+    section: typeof raw.section === "string" ? raw.section : undefined,
+    excerpt: typeof raw.excerpt === "string" ? raw.excerpt : "",
+  };
+}
+
+function normalizeDecisionStep(raw: Record<string, unknown>): DecisionStep {
+  return {
+    step: typeof raw.step === "number" ? raw.step : 0,
+    node: typeof raw.node === "string" ? raw.node : "",
+    label: typeof raw.label === "string" ? raw.label : "",
+    value: typeof raw.value === "string" ? raw.value : undefined,
+    result: typeof raw.result === "string" ? raw.result : undefined,
+  };
+}
+
+function isConfidence(v: unknown): v is "high" | "medium" | "low" {
+  return v === "high" || v === "medium" || v === "low";
+}
 
 export class Lexic {
   private apiKey: string;
@@ -43,9 +88,6 @@ export class Lexic {
 
   /**
    * Query an expert plugin. Returns a cited, decision-tree-backed answer.
-   *
-   * @param options.plugin - Plugin slug (overrides activePlugin for this call)
-   * @param options.query  - The question to ask the expert
    */
   async query(options: QueryOptions): Promise<QueryResult> {
     const plugin = options.plugin || this.activePlugin;
@@ -59,25 +101,33 @@ export class Lexic {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
+      const body: Record<string, unknown> = {
+        plugin,
+        query: options.query,
+      };
+      if (options.context?.length) body.context = options.context;
+      if (options.options) body.options = options.options;
+
       const res = await fetch(`${this.baseUrl}/api/v1/query`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.apiKey}`,
         },
-        body: JSON.stringify({ plugin, query: options.query }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as LexicError;
+        const errBody = (await res.json().catch(() => ({}))) as LexicError;
         throw new LexicAPIError(
-          body.error || `HTTP ${res.status}`,
+          errBody.error || `HTTP ${res.status}`,
           res.status,
         );
       }
 
-      return (await res.json()) as QueryResult;
+      const raw = (await res.json()) as Record<string, unknown>;
+      return normalizeQueryResult(raw);
     } catch (err) {
       if (err instanceof LexicAPIError) throw err;
       if ((err as Error).name === "AbortError") {
@@ -93,14 +143,14 @@ export class Lexic {
    * Stream a query response. Yields events as they arrive:
    *   - status  → pipeline progress (searching KB, web search, generating)
    *   - delta   → text token
-   *   - done    → final citations, confidence, decision path
+   *   - done    → final answer, citations, confidence, decision path
    *   - error   → something went wrong
    *
    * Usage:
    * ```ts
    * for await (const event of lexic.queryStream({ query: "..." })) {
    *   if (event.type === "delta") process.stdout.write(event.text);
-   *   if (event.type === "done") console.log(event.citations);
+   *   if (event.type === "done") console.log(event.answer, event.citations);
    * }
    * ```
    */
@@ -116,6 +166,14 @@ export class Lexic {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
+      const body: Record<string, unknown> = {
+        plugin,
+        query: options.query,
+        stream: true,
+      };
+      if (options.context?.length) body.context = options.context;
+      if (options.options) body.options = options.options;
+
       const res = await fetch(`${this.baseUrl}/api/v1/query`, {
         method: "POST",
         headers: {
@@ -123,13 +181,13 @@ export class Lexic {
           Authorization: `Bearer ${this.apiKey}`,
           Accept: "text/event-stream",
         },
-        body: JSON.stringify({ plugin, query: options.query, stream: true }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as LexicError;
-        throw new LexicAPIError(body.error || `HTTP ${res.status}`, res.status);
+        const errBody = (await res.json().catch(() => ({}))) as LexicError;
+        throw new LexicAPIError(errBody.error || `HTTP ${res.status}`, res.status);
       }
 
       const reader = res.body?.getReader();
@@ -152,7 +210,7 @@ export class Lexic {
             const event = JSON.parse(line.slice(6)) as StreamEvent;
             yield event;
           } catch {
-            // skip malformed events
+            // skip malformed SSE lines
           }
         }
       }
@@ -165,6 +223,51 @@ export class Lexic {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  /**
+   * Convenience wrapper: streams a query and resolves with the full QueryResult
+   * once complete. Useful when you want streaming progress events but still
+   * want a single resolved result at the end.
+   */
+  async queryStreamToResult(
+    options: QueryOptions,
+    onEvent?: (event: StreamEvent) => void,
+  ): Promise<QueryResult> {
+    let fullText = "";
+    let finalResult: QueryResult | null = null;
+
+    for await (const event of this.queryStream(options)) {
+      onEvent?.(event);
+
+      if (event.type === "delta") {
+        fullText += event.text;
+      } else if (event.type === "done") {
+        finalResult = {
+          answer: event.answer || fullText,
+          citations: Array.isArray(event.citations)
+            ? event.citations.map((c) => normalizeCitation(c as unknown as Record<string, unknown>))
+            : [],
+          decisionPath: Array.isArray(event.decisionPath)
+            ? event.decisionPath.map((d) => normalizeDecisionStep(d as unknown as Record<string, unknown>))
+            : [],
+          confidence: isConfidence(event.confidence) ? event.confidence : "low",
+          pluginVersion: typeof event.pluginVersion === "string" ? event.pluginVersion : "unknown",
+        };
+      } else if (event.type === "error") {
+        throw new LexicAPIError(event.error, 0);
+      }
+    }
+
+    if (finalResult) return finalResult;
+
+    return {
+      answer: fullText,
+      citations: [],
+      decisionPath: [],
+      confidence: "low",
+      pluginVersion: "unknown",
+    };
   }
 }
 

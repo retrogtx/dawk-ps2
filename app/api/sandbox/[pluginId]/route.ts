@@ -38,7 +38,10 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { query } = body;
+    const { query, history } = body as {
+      query?: string;
+      history?: Array<{ role: "user" | "assistant"; content: string }>;
+    };
 
     if (!query) {
       return NextResponse.json({ error: "Missing query" }, { status: 400 });
@@ -88,10 +91,21 @@ export async function POST(
 
           controller.enqueue(encoder.encode(sse({ type: "status", status: "generating", message: "Generating response..." })));
 
+          const contextPreamble = `Source Documents:\n${sourceContext || "No relevant sources found."}\n${decisionContext}\n\nAnswer the question. Prioritise the source documents and cite them with [Source N]. Supplement with your own knowledge or web search if needed.`;
+
+          const priorMessages: Array<{ role: "user" | "assistant"; content: string }> =
+            Array.isArray(history) ? history.filter((m) => m.content?.trim()) : [];
+
+          const llmMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [
+            { role: "user", content: contextPreamble },
+            ...priorMessages,
+            { role: "user", content: query },
+          ];
+
           const result = streamText({
             model: openai("gpt-5"),
             system: `${plugin.systemPrompt}\n${RULES}`,
-            prompt: `Source Documents:\n${sourceContext || "No relevant sources found."}\n${decisionContext}\n\nUser Question: ${query}\n\nAnswer the question. Prioritise the source documents and cite them with [Source N]. Supplement with your own knowledge or web search if needed.`,
+            messages: llmMessages,
             tools: {
               web_search: openai.tools.webSearch({ searchContextSize: "medium" }),
             },
@@ -132,6 +146,7 @@ export async function POST(
 
           controller.enqueue(encoder.encode(sse({
             type: "done",
+            answer: guarded.cleanedAnswer,
             citations: guarded.citations,
             confidence: guarded.confidence,
             decisionPath,

@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Copy,
   Check,
-  ChevronRight,
   Key,
   Plug,
   FileText,
@@ -1057,7 +1056,7 @@ const answer = await adapter.execute(
                   </Link>
                 </Button>
                 <Button variant="outline" className="border-[#333] text-[#ededed] hover:bg-[#1a1a1a]" asChild>
-                  <Link href="https://github.com/lexic-app/sdk" target="_blank">
+                  <Link href="https://github.com/retrogtx/dawk-ps2/tree/main/packages/sdk" target="_blank">
                     View SDK on GitHub
                     <ExternalLink className="ml-2 h-3.5 w-3.5" />
                   </Link>

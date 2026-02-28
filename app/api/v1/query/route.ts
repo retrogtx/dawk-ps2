@@ -71,9 +71,10 @@ export async function POST(req: NextRequest) {
 
     // 4. Run pipeline — check if client wants streaming
     const wantsStream = body.stream === true || req.headers.get("accept")?.includes("text/event-stream");
+    const context = Array.isArray(body.context) ? body.context : undefined;
 
     if (wantsStream) {
-      const stream = await streamQueryPipeline(pluginSlug, query, apiKey.id, { skipPublishCheck: true });
+      const stream = await streamQueryPipeline(pluginSlug, query, apiKey.id, { skipPublishCheck: true }, context);
       return new Response(stream, {
         headers: {
           "Content-Type": "text/event-stream",
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const result = await runQueryPipeline(pluginSlug, query, apiKey.id, { skipPublishCheck: true });
+    const result = await runQueryPipeline(pluginSlug, query, apiKey.id, { skipPublishCheck: true }, context);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof Error) {

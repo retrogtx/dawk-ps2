@@ -96,65 +96,61 @@ Lexic is a **web platform + API**. It is NOT a CLI tool, not a library you impor
 - [x] Add Drizzle Kit dependency
 - [x] Install missing packages (drizzle-orm, postgres, ai, @ai-sdk/openai, @supabase/supabase-js, pdf-parse, zustand, zod, svix, shadcn/ui)
 - [ ] Set up Supabase project (Postgres + Storage + pgvector extension)
-- [x] Add all env vars to `.env` (DATABASE_URL, SUPABASE_*, OPENAI_API_KEY, CLERK_WEBHOOK_SECRET) (WIP — DATABASE_URL password, OPENAI_API_KEY, CLERK_WEBHOOK_SECRET need values)
+- [x] Add all env vars to `.env` (DATABASE_URL, SUPABASE_*, OPENAI_API_KEY, ENCRYPTION_KEY)
 - [x] Create `drizzle.config.ts`
 - [x] Create Drizzle schema (`lib/db/schema.ts`) — users, plugins, knowledge_documents, knowledge_chunks, decision_trees, api_keys, query_logs
 - [x] Create Drizzle client (`lib/db/index.ts`)
-- [ ] Run `drizzle-kit push` to create tables
-- [ ] Run custom migration for pgvector extension + IVFFlat index
+- [x] Run `drizzle-kit push` to create tables
 - [x] Wrap `app/layout.tsx` with `<ClerkProvider>`
 - [x] Create `middleware.ts` (Clerk middleware protecting dashboard routes)
 - [x] Create Clerk auth pages (`sign-in/[[...sign-in]]`, `sign-up/[[...sign-up]]`)
-- [x] Create Clerk webhook endpoint (`/api/webhooks/clerk/route.ts`) for user sync
-- [x] Create `lib/auth.ts` with `requireUser()` helper
+- [x] Create `lib/auth.ts` with `requireUser()` helper (auto-creates DB user on first visit via `currentUser()` — no webhook needed)
 
 ### Phase 2: Core Engine
-- [x] `lib/engine/embedding.ts` — Vercel AI SDK `embed()` wrapper using `@ai-sdk/openai` text-embedding-3-small
-- [x] `lib/engine/chunker.ts` — PDF/markdown text → chunks with metadata
-- [ ] `lib/utils/pdf-parser.ts` — PDF text extraction via pdf-parse
-- [x] `lib/engine/retrieval.ts` — pgvector cosine similarity search (top-K, threshold)
+- [x] `lib/engine/embedding.ts` — Vercel AI SDK `embed()` + `embedMany()` wrapper using text-embedding-3-small
+- [x] `lib/engine/chunker.ts` — text → chunks with metadata (1500-char chunks, 200-char overlap)
+- [x] `lib/engine/retrieval.ts` — pgvector cosine similarity search (top-K=8, threshold=0.3)
 - [x] `lib/engine/decision-tree.ts` — JSON tree executor (condition/question/action nodes)
-- [x] `lib/engine/citation.ts` — parse [Source N] refs, map to documents, compute confidence
-- [x] `lib/engine/hallucination-guard.ts` — refuse when confidence = low
-- [x] `lib/engine/query-pipeline.ts` — orchestrator (embed → retrieve → tree → LLM → cite → log)
-- [x] `/api/v1/query/route.ts` — **THE core endpoint** (API key auth, runs pipeline, returns cited response)
-- [x] `lib/utils/api-key.ts` — key generation + hashing
+- [x] `lib/engine/citation.ts` — parse [Source N] refs, map to documents, strip phantoms, compute confidence
+- [x] `lib/engine/hallucination-guard.ts` — refuse when zero citations, self-refusal detected, or phantom majority
+- [x] `lib/engine/query-pipeline.ts` — orchestrator (embed → retrieve → tree → LLM → cite → guard → log) with both `runQueryPipeline()` and `streamQueryPipeline()`
+- [x] `/api/v1/query/route.ts` — **THE core endpoint** (API key auth, runs pipeline, supports both JSON and SSE streaming)
+- [x] `lib/utils/api-key.ts` — key generation + hashing + AES-256-GCM encryption/decryption
 
 ### Phase 3: Web App UI
-- [x] Install + configure shadcn/ui components
-- [x] Plugin list page (`/plugins`)
-- [x] Plugin creation form (`/plugins/new`) — name, domain, system prompt, citation mode
+- [x] Install + configure shadcn/ui components (button, input, textarea, label, dialog, dropdown-menu, select, tabs, badge, sonner, silk)
+- [x] Plugin list page (`/plugins`) — grid view with search, export as JSON
+- [x] Plugin creation form (`/plugins/new`) — name, slug, domain, system prompt, citation mode
 - [x] Knowledge base upload UI (`/plugins/[id]/knowledge`) — text paste + file upload, auto chunk+embed
 - [x] Decision tree editor (`/plugins/[id]/trees`) — JSON editor with example template
-- [x] Test sandbox (`/plugins/[id]/sandbox`) — chat interface with citations + decision path display
-- [x] Plugin publish flow (`/plugins/[id]` → publish button)
-- [x] API key management page (`/api-keys`) — create, list, revoke keys
-- [x] Landing page (`/`) — value prop, CTAs, use case examples
-- [x] Documentation page (`/docs`) — full API reference, SDK guide, framework adapters
+- [x] Test sandbox (`/plugins/[id]/sandbox`) — streaming chat interface with citations + decision path + web search status
+- [x] Plugin settings (`/plugins/[id]`) — edit, publish/unpublish toggle, share to marketplace, QR code
+- [x] API key management page (`/api-keys`) — create, list, reveal (decrypted), revoke keys
+- [x] Landing page (`/`) — value prop, feature grid, CTA
+- [x] Documentation page (`/docs`) — full API reference, SDK guide, framework adapter examples
 
 ### Phase 4: SDK & Integration
-- [x] Create `packages/sdk/` package structure
-- [x] `lexic-sdk` core — `Lexic` client with `query()` + `setActivePlugin()`
-- [x] LangChain adapter (`LexicTool`)
-- [x] AutoGPT adapter
+- [x] Create `packages/sdk/` package structure (`lexic-sdk` npm package)
+- [x] Core SDK — `Lexic` client with `query()`, `queryStream()`, `queryStreamToResult()`, `setActivePlugin()`; supports `context` (conversation history) and `options` (citationMode, maxSources, includeDecisionPath); all responses normalized with safe defaults
+- [x] LangChain adapter (`LexicTool`) — returns JSON with full citation metadata
+- [x] AutoGPT adapter (`LexicAutoGPT`) — returns human-readable text with citations and decision path
+- [x] SDK test suite (69 unit tests covering normalization, adapters, error handling)
 - [ ] Create 1 demo plugin: "Structural Engineering - IS 456" with knowledge base + decision tree
 - [ ] End-to-end demo: LangChain agent using the demo plugin
 
 ### Phase 5: Marketplace & Polish
-- [ ] Marketplace browse page (`/marketplace`) — list published plugins
-- [ ] Marketplace plugin detail page (`/marketplace/[slug]`)
-- [ ] `/api/marketplace` routes (public, no auth required)
-- [ ] Usage analytics dashboard (`/analytics`)
+- [x] Marketplace browse page (`/marketplace`) — list plugins shared by creators, search/filter
+- [x] Marketplace plugin detail page (`/marketplace/[slug]`) — plugin info + download
+- [x] `/api/marketplace/[slug]/download` route — download shared plugin as JSON
 - [ ] Error handling + loading states across all pages
-- [ ] Deploy to Vercel
 
 ### Stretch Goals
 - [ ] Visual drag-and-drop decision tree editor
 - [ ] Plugin ratings and reviews
 - [ ] Multi-plugin stacking with conflict resolution
 - [ ] Confidence scoring display in UI
-- [ ] CrewAI adapter for SDK
 - [ ] Royalty/monetization system for plugin creators
+- [ ] Supabase Storage integration for file uploads (scaffolding removed — currently using text paste + inline upload)
 
 ---
 

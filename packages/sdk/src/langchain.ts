@@ -16,7 +16,7 @@
  */
 
 import { Lexic, LexicAPIError } from "./index";
-import type { QueryResult } from "./types";
+import type { QueryResult, QueryRequestOptions } from "./types";
 
 export interface LexicToolConfig {
   apiKey: string;
@@ -24,6 +24,8 @@ export interface LexicToolConfig {
   baseUrl?: string;
   name?: string;
   description?: string;
+  /** Default query options applied to every call through this tool. */
+  queryOptions?: QueryRequestOptions;
 }
 
 /**
@@ -37,6 +39,7 @@ export class LexicTool {
 
   private client: Lexic;
   private plugin: string;
+  private queryOptions?: QueryRequestOptions;
 
   constructor(config: LexicToolConfig) {
     this.client = new Lexic({
@@ -44,6 +47,7 @@ export class LexicTool {
       baseUrl: config.baseUrl,
     });
     this.plugin = config.plugin;
+    this.queryOptions = config.queryOptions;
     this.name = config.name || `lexic_${config.plugin.replace(/-/g, "_")}`;
     this.description =
       config.description ||
@@ -55,24 +59,20 @@ export class LexicTool {
     return this._call(input);
   }
 
-  /** LangChain StructuredTool._call implementation. */
+  /**
+   * LangChain StructuredTool._call implementation.
+   * Returns a JSON string that includes the full answer with inline citations,
+   * source metadata, confidence level, and the decision reasoning path.
+   */
   async _call(input: string): Promise<string> {
     try {
       const result: QueryResult = await this.client.query({
         plugin: this.plugin,
         query: input,
+        options: this.queryOptions,
       });
 
-      return JSON.stringify({
-        answer: result.answer,
-        citations: result.citations.map((c) => ({
-          document: c.document,
-          section: c.section,
-          excerpt: c.excerpt,
-        })),
-        confidence: result.confidence,
-        decisionPath: result.decisionPath,
-      });
+      return formatResultForAgent(result);
     } catch (err) {
       if (err instanceof LexicAPIError) {
         return JSON.stringify({ error: err.message, status: err.status });
@@ -85,4 +85,31 @@ export class LexicTool {
   setPlugin(pluginSlug: string): void {
     this.plugin = pluginSlug;
   }
+}
+
+/**
+ * Format a QueryResult into a JSON string suitable for LLM agent consumption.
+ * Includes full citation metadata (document, page, section, excerpt) so the
+ * agent can reference sources accurately.
+ */
+function formatResultForAgent(result: QueryResult): string {
+  const citations = (result.citations ?? []).map((c) => ({
+    id: c.id,
+    document: c.document,
+    ...(c.page != null && { page: c.page }),
+    ...(c.section && { section: c.section }),
+    excerpt: c.excerpt,
+  }));
+
+  const output: Record<string, unknown> = {
+    answer: result.answer,
+    confidence: result.confidence,
+    citations,
+  };
+
+  if (result.decisionPath?.length) {
+    output.decisionPath = result.decisionPath;
+  }
+
+  return JSON.stringify(output);
 }

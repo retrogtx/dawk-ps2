@@ -90,10 +90,14 @@ export default function SandboxPage() {
     const assistantIdx = messages.length + 1;
 
     try {
+      const history = messages
+        .filter((m) => !m.streaming)
+        .map((m) => ({ role: m.role, content: m.content }));
+
       const res = await fetch(`/api/sandbox/${pluginId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, history }),
       });
 
       if (!res.ok) {
