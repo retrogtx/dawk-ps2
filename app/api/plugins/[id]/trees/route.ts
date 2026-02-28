@@ -4,12 +4,22 @@ import { db } from "@/lib/db";
 import { plugins, decisionTrees } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
+type User = Awaited<ReturnType<typeof requireUser>>;
+
+const MAX_NODES = 500;
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let user: User;
   try {
-    const user = await requireUser();
+    user = await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
     const { id } = await params;
 
     const plugin = await db.query.plugins.findFirst({
@@ -26,7 +36,7 @@ export async function GET(
 
     return NextResponse.json(trees);
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -45,12 +55,25 @@ export async function POST(
       return NextResponse.json({ error: "Plugin not found" }, { status: 404 });
     }
 
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
     const { name, description, treeData } = body;
 
-    if (!name || !treeData) {
+    if (!name || typeof name !== "string" || name.length > 200) {
       return NextResponse.json(
-        { error: "Missing required fields: name, treeData" },
+        { error: "name must be a string under 200 characters" },
+        { status: 400 },
+      );
+    }
+
+    if (!treeData) {
+      return NextResponse.json(
+        { error: "Missing required field: treeData" },
         { status: 400 },
       );
     }
@@ -60,17 +83,33 @@ export async function POST(
       typeof treeData !== "object" ||
       typeof treeData.rootNodeId !== "string" ||
       typeof treeData.nodes !== "object" ||
-      treeData.nodes === null ||
-      !treeData.nodes[treeData.rootNodeId]
+      treeData.nodes === null
     ) {
       return NextResponse.json(
-        { error: "Invalid treeData: must have rootNodeId (string) and nodes (object) with the root node present" },
+        { error: "Invalid treeData: must have rootNodeId (string) and nodes (object)" },
         { status: 400 },
       );
     }
 
-    // Validate each node has required fields with correct types
-    for (const [nodeId, node] of Object.entries(treeData.nodes)) {
+    // Guard against prototype pollution — use hasOwnProperty
+    if (!Object.prototype.hasOwnProperty.call(treeData.nodes, treeData.rootNodeId)) {
+      return NextResponse.json(
+        { error: "Root node not found in nodes" },
+        { status: 400 },
+      );
+    }
+
+    // Limit node count
+    const nodeEntries = Object.entries(treeData.nodes);
+    if (nodeEntries.length > MAX_NODES) {
+      return NextResponse.json(
+        { error: `Tree cannot exceed ${MAX_NODES} nodes` },
+        { status: 400 },
+      );
+    }
+
+    // Validate each node
+    for (const [nodeId, node] of nodeEntries) {
       const n = node as Record<string, unknown>;
       if (
         !n ||
@@ -96,7 +135,7 @@ export async function POST(
           { status: 400 },
         );
       }
-      // Condition nodes must have a condition object with field and operator
+      // Condition nodes must have condition.field and condition.operator
       if (n.type === "condition") {
         const cond = n.condition as Record<string, unknown> | undefined;
         if (!cond || typeof cond.field !== "string" || typeof cond.operator !== "string") {
@@ -113,7 +152,7 @@ export async function POST(
       .values({
         pluginId: id,
         name,
-        description: description || null,
+        description: typeof description === "string" ? description.slice(0, 1000) : null,
         treeData,
       })
       .returning();

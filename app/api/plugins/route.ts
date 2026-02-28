@@ -12,6 +12,8 @@ function slugify(name: string): string {
     .slice(0, 60);
 }
 
+const ALLOWED_CITATION_MODES = ["mandatory", "optional", "none", "off"];
+
 export async function GET() {
   try {
     const user = await requireUser();
@@ -21,7 +23,7 @@ export async function GET() {
       .where(eq(plugins.creatorId, user.id))
       .orderBy(desc(plugins.createdAt));
     return NextResponse.json(userPlugins);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }
@@ -29,29 +31,50 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const user = await requireUser();
-    const body = await req.json();
+
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
     const { name, domain, description, systemPrompt, citationMode } = body;
 
-    if (!name || !domain || !systemPrompt) {
+    if (!name || typeof name !== "string" || !domain || typeof domain !== "string" || !systemPrompt || typeof systemPrompt !== "string") {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required fields: name, domain, systemPrompt" },
         { status: 400 },
       );
     }
+
+    // Length limits
+    if (name.length > 200) {
+      return NextResponse.json({ error: "Name must be under 200 characters" }, { status: 400 });
+    }
+    if (domain.length > 200) {
+      return NextResponse.json({ error: "Domain must be under 200 characters" }, { status: 400 });
+    }
+    if (systemPrompt.length > 10000) {
+      return NextResponse.json({ error: "System prompt must be under 10,000 characters" }, { status: 400 });
+    }
+    if (description && typeof description === "string" && description.length > 2000) {
+      return NextResponse.json({ error: "Description must be under 2,000 characters" }, { status: 400 });
+    }
+
+    // Validate citationMode before normalization
+    if (citationMode && !ALLOWED_CITATION_MODES.includes(citationMode)) {
+      return NextResponse.json(
+        { error: `Invalid citationMode. Allowed: ${ALLOWED_CITATION_MODES.join(", ")}` },
+        { status: 400 },
+      );
+    }
+    const resolvedCitationMode = citationMode === "off" ? "none" : (citationMode || "mandatory");
 
     const baseSlug = slugify(name);
     if (!baseSlug) {
       return NextResponse.json(
         { error: "Plugin name must contain at least one alphanumeric character" },
-        { status: 400 },
-      );
-    }
-
-    const allowedCitationModes = ["mandatory", "optional", "none", "off"];
-    const resolvedCitationMode = citationMode === "off" ? "none" : (citationMode || "mandatory");
-    if (citationMode && !allowedCitationModes.includes(citationMode)) {
-      return NextResponse.json(
-        { error: `Invalid citationMode. Allowed: mandatory, optional, none, off` },
         { status: 400 },
       );
     }

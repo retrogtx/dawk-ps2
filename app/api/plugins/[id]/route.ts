@@ -6,6 +6,8 @@ import { eq, and } from "drizzle-orm";
 
 type User = Awaited<ReturnType<typeof requireUser>>;
 
+const ALLOWED_CITATION_MODES = ["mandatory", "optional", "none", "off"];
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -45,7 +47,13 @@ export async function PUT(
 
   try {
     const { id } = await params;
-    const body = await req.json();
+
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
     const existing = await db.query.plugins.findFirst({
       where: and(eq(plugins.id, id), eq(plugins.creatorId, user.id)),
@@ -54,15 +62,28 @@ export async function PUT(
       return NextResponse.json({ error: "Plugin not found" }, { status: 404 });
     }
 
-    const allowedCitationModes = ["mandatory", "optional", "none", "off"];
+    // Field length validation
+    if (body.name !== undefined && (typeof body.name !== "string" || body.name.length > 200)) {
+      return NextResponse.json({ error: "Name must be a string under 200 characters" }, { status: 400 });
+    }
+    if (body.domain !== undefined && (typeof body.domain !== "string" || body.domain.length > 200)) {
+      return NextResponse.json({ error: "Domain must be a string under 200 characters" }, { status: 400 });
+    }
+    if (body.systemPrompt !== undefined && (typeof body.systemPrompt !== "string" || body.systemPrompt.length > 10000)) {
+      return NextResponse.json({ error: "System prompt must be a string under 10,000 characters" }, { status: 400 });
+    }
+    if (body.description !== undefined && body.description !== null && (typeof body.description !== "string" || body.description.length > 2000)) {
+      return NextResponse.json({ error: "Description must be a string under 2,000 characters" }, { status: 400 });
+    }
+
+    // citationMode validation — validate before normalization
     const rawCitationMode = body.citationMode ?? existing.citationMode;
-    if (!allowedCitationModes.includes(rawCitationMode)) {
+    if (!ALLOWED_CITATION_MODES.includes(rawCitationMode)) {
       return NextResponse.json(
-        { error: `Invalid citationMode. Allowed: ${allowedCitationModes.join(", ")}` },
+        { error: `Invalid citationMode. Allowed: ${ALLOWED_CITATION_MODES.join(", ")}` },
         { status: 400 },
       );
     }
-    // Normalize "off" to "none" for DB storage
     const citationMode = rawCitationMode === "off" ? "none" : rawCitationMode;
 
     const [updated] = await db
@@ -76,7 +97,7 @@ export async function PUT(
         isPublished: body.isPublished ?? existing.isPublished,
         updatedAt: new Date(),
       })
-      .where(eq(plugins.id, id))
+      .where(and(eq(plugins.id, id), eq(plugins.creatorId, user.id)))
       .returning();
 
     return NextResponse.json(updated);
@@ -106,7 +127,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Plugin not found" }, { status: 404 });
     }
 
-    await db.delete(plugins).where(eq(plugins.id, id));
+    // Include ownership in WHERE to prevent TOCTOU race
+    await db.delete(plugins).where(and(eq(plugins.id, id), eq(plugins.creatorId, user.id)));
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

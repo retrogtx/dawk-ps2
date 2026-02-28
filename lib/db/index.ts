@@ -7,7 +7,7 @@ if (!process.env.DATABASE_URL) {
 }
 
 const queryClient = postgres(process.env.DATABASE_URL, {
-  max: 3,
+  max: 1,              // Serverless: one connection per instance avoids pool exhaustion
   idle_timeout: 20,
   connect_timeout: 10,
 });

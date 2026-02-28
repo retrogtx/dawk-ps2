@@ -17,15 +17,22 @@ const ALLOWED_MIME_TYPES = [
 ];
 const ALLOWED_EXTENSIONS = [".txt", ".md", ".csv", ".json", ".pdf"];
 
+type User = Awaited<ReturnType<typeof requireUser>>;
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let user: User;
   try {
-    const user = await requireUser();
+    user = await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
     const { id } = await params;
 
-    // Verify ownership
     const plugin = await db.query.plugins.findFirst({
       where: and(eq(plugins.id, id), eq(plugins.creatorId, user.id)),
     });
@@ -33,14 +40,22 @@ export async function GET(
       return NextResponse.json({ error: "Plugin not found" }, { status: 404 });
     }
 
+    // Exclude rawText from listing to avoid returning 10MB+ per document
     const docs = await db
-      .select()
+      .select({
+        id: knowledgeDocuments.id,
+        pluginId: knowledgeDocuments.pluginId,
+        fileName: knowledgeDocuments.fileName,
+        fileType: knowledgeDocuments.fileType,
+        storagePath: knowledgeDocuments.storagePath,
+        createdAt: knowledgeDocuments.createdAt,
+      })
       .from(knowledgeDocuments)
       .where(eq(knowledgeDocuments.pluginId, id));
 
     return NextResponse.json(docs);
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -63,8 +78,10 @@ export async function POST(
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const text = formData.get("text") as string | null;
-    const fileName = formData.get("fileName") as string || file?.name || "untitled";
-    const fileType = formData.get("fileType") as string || "markdown";
+    // Sanitize fileName: strip dangerous chars, limit length
+    const rawFileName = String(formData.get("fileName") || file?.name || "untitled");
+    const fileName = rawFileName.slice(0, 255).replace(/[<>"/\\]/g, "");
+    const fileType = String(formData.get("fileType") || "markdown").slice(0, 50);
 
     let rawText = text || "";
 
@@ -76,13 +93,13 @@ export async function POST(
         );
       }
 
-      // Validate by MIME type and file extension
+      // Validate by MIME type and file extension — reject if either is present and invalid
       const ext = file.name ? `.${file.name.split(".").pop()?.toLowerCase()}` : "";
-      const mimeValid = !file.type || ALLOWED_MIME_TYPES.includes(file.type);
-      const extValid = !ext || ALLOWED_EXTENSIONS.includes(ext);
+      const mimeValid = file.type !== "" ? ALLOWED_MIME_TYPES.includes(file.type) : true;
+      const extValid = ext !== "" && ext !== "." ? ALLOWED_EXTENSIONS.includes(ext) : false;
       if (!mimeValid || !extValid) {
         return NextResponse.json(
-          { error: `Unsupported file type. Allowed: ${ALLOWED_EXTENSIONS.join(", ")}` },
+          { error: `Unsupported file. Allowed extensions: ${ALLOWED_EXTENSIONS.join(", ")}` },
           { status: 400 },
         );
       }
@@ -90,7 +107,7 @@ export async function POST(
       rawText = await file.text();
     }
 
-    // Also limit pasted text size
+    // Limit pasted text size
     if (rawText.length > MAX_TEXT_SIZE) {
       return NextResponse.json(
         { error: `Content too large. Maximum size is ${MAX_TEXT_SIZE / 1024 / 1024}MB` },
@@ -119,9 +136,9 @@ export async function POST(
     // 2. Chunk the text
     const chunks = chunkText(rawText, { fileName, fileType });
 
-    // 3. Embed all chunks
+    // 3. Embed all chunks (skip if no chunks to avoid empty API call)
     const chunkTexts = chunks.map((c) => c.content);
-    const embeddings = await embedTexts(chunkTexts);
+    const embeddings = chunks.length > 0 ? await embedTexts(chunkTexts) : [];
 
     // 4. Insert chunks with embeddings
     if (chunks.length > 0) {
@@ -140,7 +157,10 @@ export async function POST(
     }
 
     return NextResponse.json({
-      ...doc,
+      id: doc.id,
+      pluginId: doc.pluginId,
+      fileName: doc.fileName,
+      fileType: doc.fileType,
       chunksCreated: chunks.length,
     }, { status: 201 });
   } catch (error) {
@@ -153,8 +173,14 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let user: User;
   try {
-    const user = await requireUser();
+    user = await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
     const { id } = await params;
     const { searchParams } = new URL(req.url);
     const docId = searchParams.get("docId");
@@ -181,6 +207,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
