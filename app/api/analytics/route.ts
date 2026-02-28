@@ -16,6 +16,19 @@ function rangeToInterval(range: string): string | null {
   }
 }
 
+function resultRows<T>(result: unknown): T[] {
+  if (Array.isArray(result)) return result as T[];
+  if (
+    result &&
+    typeof result === "object" &&
+    "rows" in result &&
+    Array.isArray((result as { rows?: unknown }).rows)
+  ) {
+    return (result as { rows: T[] }).rows;
+  }
+  return [];
+}
+
 export async function GET(req: NextRequest) {
   try {
     const user = await requireUser();
@@ -62,30 +75,26 @@ export async function GET(req: NextRequest) {
       : sql``;
     const pluginFilter = sql`ql.plugin_id IN (${sql.join(targetPluginIds.map((id) => sql`${id}`), sql`, `)})`;
 
-    // 7 parallel queries
-    const [summaryResult, confidenceResult, overTimeResult, topQueriesResult, topSourcesResult, decisionPathsResult, citationRateResult] = await Promise.all([
-      // 1. Summary stats
-      db.execute(sql`
+    // Execute sequentially to avoid connection spikes under load.
+    const summaryResult = await db.execute(sql`
         SELECT
           COUNT(*)::int AS total_queries,
           COALESCE(AVG(ql.latency_ms), 0)::float AS avg_latency_ms,
           COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ql.latency_ms), 0)::float AS median_latency_ms
         FROM query_logs ql
         WHERE ${pluginFilter} ${dateFilter}
-      `),
+      `);
 
-      // 2. Confidence breakdown
-      db.execute(sql`
+    const confidenceResult = await db.execute(sql`
         SELECT
           COALESCE(ql.confidence, 'unknown') AS confidence,
           COUNT(*)::int AS count
         FROM query_logs ql
         WHERE ${pluginFilter} ${dateFilter}
         GROUP BY ql.confidence
-      `),
+      `);
 
-      // 3. Queries over time
-      db.execute(sql`
+    const overTimeResult = await db.execute(sql`
         SELECT
           date_trunc('day', ql.created_at)::date::text AS date,
           COUNT(*)::int AS count,
@@ -94,10 +103,9 @@ export async function GET(req: NextRequest) {
         WHERE ${pluginFilter} ${dateFilter}
         GROUP BY date_trunc('day', ql.created_at)
         ORDER BY date_trunc('day', ql.created_at)
-      `),
+      `);
 
-      // 4. Top queries
-      db.execute(sql`
+    const topQueriesResult = await db.execute(sql`
         SELECT
           ql.query_text,
           COUNT(*)::int AS count,
@@ -107,63 +115,81 @@ export async function GET(req: NextRequest) {
         GROUP BY ql.query_text
         ORDER BY count DESC
         LIMIT 10
-      `),
+      `);
 
-      // 5. Top sources from citations JSONB
-      db.execute(sql`
+    const topSourcesResult = await db.execute(sql`
         SELECT
           COALESCE(c->>'document', 'Unknown') AS document,
           COUNT(*)::int AS citation_count,
-          AVG(CASE WHEN c->>'similarity' ~ '^[0-9]*\.?[0-9]+$' THEN (c->>'similarity')::float ELSE NULL END) AS avg_similarity
+          AVG(
+            CASE
+              WHEN c->>'similarity' ~ '^[+-]?[0-9]+([.][0-9]+)?$'
+                THEN (c->>'similarity')::float
+              ELSE NULL
+            END
+          ) AS avg_similarity
         FROM query_logs ql,
           LATERAL jsonb_array_elements(
-            CASE WHEN jsonb_typeof(ql.citations) = 'array' AND jsonb_array_length(ql.citations) > 0
-              THEN ql.citations ELSE '[]'::jsonb END
+            CASE
+              WHEN jsonb_typeof(ql.citations) = 'array' THEN ql.citations
+              ELSE '[]'::jsonb
+            END
           ) AS c
         WHERE ${pluginFilter} ${dateFilter}
           AND c->>'document' IS NOT NULL
         GROUP BY c->>'document'
         ORDER BY citation_count DESC
         LIMIT 10
-      `),
+      `);
 
-      // 6. Decision path usage
-      db.execute(sql`
+    const decisionPathsResult = await db.execute(sql`
         SELECT
           COALESCE(d->>'label', 'Unnamed') AS label,
           COUNT(*)::int AS count
         FROM query_logs ql,
           LATERAL jsonb_array_elements(
-            CASE WHEN jsonb_typeof(ql.decision_path) = 'array' AND jsonb_array_length(ql.decision_path) > 0
-              THEN ql.decision_path ELSE '[]'::jsonb END
+            CASE
+              WHEN jsonb_typeof(ql.decision_path) = 'array' THEN ql.decision_path
+              ELSE '[]'::jsonb
+            END
           ) AS d
         WHERE ${pluginFilter} ${dateFilter}
         GROUP BY COALESCE(d->>'label', 'Unnamed')
         ORDER BY count DESC
         LIMIT 10
-      `),
+      `);
 
-      // 7. Citation rate
-      db.execute(sql`
+    const citationRateResult = await db.execute(sql`
         SELECT
           COUNT(*) FILTER (
-            WHERE jsonb_typeof(ql.citations) = 'array' AND jsonb_array_length(ql.citations) > 0
+            WHERE CASE
+              WHEN jsonb_typeof(ql.citations) = 'array' THEN jsonb_array_length(ql.citations) > 0
+              ELSE FALSE
+            END
           )::float / GREATEST(COUNT(*), 1)::float * 100 AS citation_rate,
           COALESCE(
             AVG(
-              CASE WHEN jsonb_typeof(ql.citations) = 'array'
-                THEN jsonb_array_length(ql.citations) ELSE 0 END
+              CASE
+                WHEN jsonb_typeof(ql.citations) = 'array'
+                  THEN jsonb_array_length(ql.citations)::float
+                ELSE 0
+              END
             ), 0
           )::float AS avg_citations_per_query
         FROM query_logs ql
         WHERE ${pluginFilter} ${dateFilter}
-      `),
-    ]);
+      `);
 
-    // Parse results — db.execute() returns an array of records directly
-    const summary = summaryResult[0] as { total_queries: number; avg_latency_ms: number; median_latency_ms: number } | undefined;
-    const confidenceRows = confidenceResult as unknown as Array<{ confidence: string; count: number }>;
-    const citationRate = citationRateResult[0] as { citation_rate: number; avg_citations_per_query: number } | undefined;
+    const summaryRows = resultRows<{ total_queries: number; avg_latency_ms: number; median_latency_ms: number }>(summaryResult);
+    const confidenceRows = resultRows<{ confidence: string; count: number }>(confidenceResult);
+    const overTimeRows = resultRows<{ date: string; count: number; avg_latency_ms: number }>(overTimeResult);
+    const topQueriesRows = resultRows<{ query_text: string; count: number; mode_confidence: string }>(topQueriesResult);
+    const topSourcesRows = resultRows<{ document: string; citation_count: number; avg_similarity: number | null }>(topSourcesResult);
+    const decisionPathRows = resultRows<{ label: string; count: number }>(decisionPathsResult);
+    const citationRateRows = resultRows<{ citation_rate: number; avg_citations_per_query: number }>(citationRateResult);
+
+    const summary = summaryRows[0];
+    const citationRate = citationRateRows[0];
 
     const confidenceBreakdown = { high: 0, medium: 0, low: 0 };
     for (const row of confidenceRows) {
@@ -182,22 +208,22 @@ export async function GET(req: NextRequest) {
         citationRate: Math.round(citationRate?.citation_rate ?? 0),
         avgCitationsPerQuery: Math.round((citationRate?.avg_citations_per_query ?? 0) * 10) / 10,
       },
-      queriesOverTime: (overTimeResult as unknown as Array<{ date: string; count: number; avg_latency_ms: number }>).map((r) => ({
+      queriesOverTime: overTimeRows.map((r) => ({
         date: r.date,
         count: r.count,
         avgLatencyMs: Math.round(r.avg_latency_ms),
       })),
-      topQueries: (topQueriesResult as unknown as Array<{ query_text: string; count: number; mode_confidence: string }>).map((r) => ({
+      topQueries: topQueriesRows.map((r) => ({
         queryText: r.query_text,
         count: r.count,
-        modeConfidence: r.mode_confidence,
+        modeConfidence: r.mode_confidence || "unknown",
       })),
-      topSources: (topSourcesResult as unknown as Array<{ document: string; citation_count: number; avg_similarity: number | null }>).map((r) => ({
+      topSources: topSourcesRows.map((r) => ({
         document: r.document,
         citationCount: r.citation_count,
         avgSimilarity: r.avg_similarity != null ? Math.round(r.avg_similarity * 100) / 100 : null,
       })),
-      topDecisionPaths: (decisionPathsResult as unknown as Array<{ label: string; count: number }>).map((r) => ({
+      topDecisionPaths: decisionPathRows.map((r) => ({
         label: r.label,
         count: r.count,
       })),
@@ -207,7 +233,10 @@ export async function GET(req: NextRequest) {
     if (err instanceof Error && err.message === "Unauthorized") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.error("[analytics] Error:", err);
+    console.error("[analytics] Error:", {
+      message: err instanceof Error ? err.message : "Unknown error",
+      error: err,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
