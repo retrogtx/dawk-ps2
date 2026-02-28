@@ -23,6 +23,9 @@ export default function LandingPage() {
           </Link>
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" className="text-[#a1a1a1] hover:text-white hover:bg-[#1a1a1a]" asChild>
+              <Link href="/docs">Docs</Link>
+            </Button>
+            <Button variant="ghost" size="sm" className="text-[#a1a1a1] hover:text-white hover:bg-[#1a1a1a]" asChild>
               <Link href="/sign-in">Sign In</Link>
             </Button>
             <Button size="sm" className="bg-white text-black hover:bg-[#ccc] font-semibold" asChild>
