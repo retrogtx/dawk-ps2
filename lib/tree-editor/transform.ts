@@ -30,6 +30,13 @@ export interface FlowNodeData {
 const NODE_SPACING_X = 250;
 const NODE_SPACING_Y = 150;
 
+function parseInConditionValue(value: string): string[] {
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+}
+
 /**
  * Convert a DecisionTreeData JSON structure into ReactFlow nodes and edges.
  * Uses BFS from root to auto-layout nodes in a top-down tree.
@@ -176,7 +183,9 @@ function decisionNodeToFlowData(node: DecisionNode, isRoot: boolean): FlowNodeDa
   } else if (node.type === "condition" && node.condition) {
     data.conditionField = node.condition.field;
     data.conditionOperator = node.condition.operator;
-    data.conditionValue = String(node.condition.value);
+    data.conditionValue = Array.isArray(node.condition.value)
+      ? node.condition.value.join(", ")
+      : String(node.condition.value);
   } else if (node.type === "action" && node.action) {
     data.recommendation = node.action.recommendation;
     data.sourceHint = node.action.sourceHint;
@@ -257,10 +266,14 @@ export function flowToDecisionTree(
         }
       }
     } else if (node.data.nodeType === "condition") {
+      const operator = node.data.conditionOperator || "eq";
       dn.condition = {
         field: node.data.conditionField || "",
-        operator: node.data.conditionOperator || "eq",
-        value: node.data.conditionValue || "",
+        operator,
+        value:
+          operator === "in"
+            ? parseInConditionValue(node.data.conditionValue || "")
+            : node.data.conditionValue || "",
       };
 
       // Build trueChildId/falseChildId from edges

@@ -126,20 +126,31 @@ function evaluateCondition(
   value: string | undefined,
 ): boolean {
   if (value === undefined) return false;
+  const normalizedValue = value.trim().toLowerCase();
 
   switch (condition.operator) {
     case "eq":
-      return value.toLowerCase() === String(condition.value).toLowerCase();
+      return normalizedValue === String(condition.value).trim().toLowerCase();
     case "gt":
       return Number(value) > Number(condition.value);
     case "lt":
       return Number(value) < Number(condition.value);
     case "contains":
-      return value.toLowerCase().includes(String(condition.value).toLowerCase());
+      return normalizedValue.includes(String(condition.value).trim().toLowerCase());
     case "in":
-      return Array.isArray(condition.value)
-        ? condition.value.map((v) => v.toLowerCase()).includes(value.toLowerCase())
-        : false;
+      if (Array.isArray(condition.value)) {
+        return condition.value.map((v) => v.trim().toLowerCase()).includes(normalizedValue);
+      }
+
+      if (typeof condition.value === "string") {
+        return condition.value
+          .split(",")
+          .map((v) => v.trim().toLowerCase())
+          .filter((v) => v !== "")
+          .includes(normalizedValue);
+      }
+
+      return false;
     default:
       return false;
   }
