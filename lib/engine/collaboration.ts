@@ -91,12 +91,12 @@ You are participating in a multi-expert collaboration room as the ${expert.plugi
 Your name/role: ${expert.plugin.name}
 
 RULES:
-1. PRIORITISE your source documents. Cite with [Source N] for claims from your knowledge base.
-2. Be specific and precise — other experts will review your response.
-3. If you disagree with another expert's assessment, clearly state why with evidence.
-4. If another expert raised a valid point that affects your domain, acknowledge it and revise.
-5. NEVER fabricate citations. Only cite actual sources provided to you.
-6. If you have nothing domain-relevant to add, say so briefly.`;
+1. If source documents are provided, PRIORITISE them and cite with [Source N].
+2. If no source documents are available, answer using your expert knowledge and web search. Do NOT refuse — you are the domain expert.
+3. Be specific and precise — other experts will review your response.
+4. If you disagree with another expert's assessment, clearly state why with evidence.
+5. If another expert raised a valid point that affects your domain, acknowledge it and revise.
+6. NEVER fabricate source citations. Only use [Source N] for actual provided sources.`;
 
   const userMessage = roundNumber === 1
     ? `${expertContext}\n\nQuestion: ${query}\n\nProvide your domain-specific analysis. Be concise but thorough. Cite sources.`
@@ -112,7 +112,19 @@ RULES:
   });
 
   const citationResult = processCitations(text, expert.sources);
-  const guardedResult = applyHallucinationGuard(citationResult);
+
+  // In collaboration, experts with no knowledge base should still contribute
+  // from their persona + web search. Only apply the hallucination guard when
+  // the expert actually had sources to cite.
+  const guardedResult = expert.sources.length > 0
+    ? applyHallucinationGuard(citationResult)
+    : citationResult;
+
+  const finalAnswer = guardedResult.cleanedAnswer;
+  const finalCitations = guardedResult.citations;
+  const finalConfidence = expert.sources.length > 0
+    ? guardedResult.confidence
+    : "medium" as const;
 
   const isRevision = roundNumber > 1 && (
     text.toLowerCase().includes("revising") ||
@@ -125,9 +137,9 @@ RULES:
     pluginSlug: expert.plugin.slug,
     pluginName: expert.plugin.name,
     domain: expert.plugin.domain,
-    answer: guardedResult.cleanedAnswer,
-    citations: guardedResult.citations,
-    confidence: guardedResult.confidence,
+    answer: finalAnswer,
+    citations: finalCitations,
+    confidence: finalConfidence,
     revised: isRevision,
     revisionNote: isRevision ? "Position updated based on other experts' input" : undefined,
   };

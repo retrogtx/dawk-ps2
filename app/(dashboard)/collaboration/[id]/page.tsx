@@ -324,7 +324,7 @@ export default function CollaborationRoomPage() {
                       const color = getExpertColor(idx >= 0 ? idx : respIdx);
                       return (
                         <div
-                          key={`${round.roundNumber}-${resp.pluginSlug}`}
+                          key={`${round.roundNumber}-${respIdx}-${resp.pluginSlug}`}
                           className={`rounded-lg border ${color.border} bg-[#111] p-4`}
                         >
                           <div className="mb-2 flex items-center justify-between">
