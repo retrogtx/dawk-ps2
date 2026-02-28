@@ -45,11 +45,6 @@ export function decisionTreeToFlow(tree: DecisionTreeData): {
     return { nodes, edges };
   }
 
-  // BFS to assign positions
-  const visited = new Set<string>();
-  const queue: { id: string; depth: number; index: number; parentCount: number }[] = [];
-  const depthCounts: Map<number, number> = new Map();
-
   // First pass: count nodes at each depth for centering
   const depthNodes: Map<number, string[]> = new Map();
   const bfsQueue: { id: string; depth: number }[] = [{ id: tree.rootNodeId, depth: 0 }];
@@ -91,7 +86,7 @@ export function decisionTreeToFlow(tree: DecisionTreeData): {
     });
   }
 
-  // Third pass: include disconnected (unreachable) nodes AND their edges
+  // Third pass: include disconnected (unreachable) nodes.
   const maxDepth = Math.max(...Array.from(depthNodes.keys()), 0);
   let orphanIndex = 0;
   for (const [nodeId, dn] of Object.entries(tree.nodes)) {
@@ -173,7 +168,7 @@ function decisionNodeToFlowData(node: DecisionNode, isRoot: boolean): FlowNodeDa
   if (node.type === "question" && node.question) {
     data.questionText = node.question.text;
     data.extractFrom = node.question.extractFrom;
-    data.options = node.question.options || [];
+    data.options = normalizeQuestionOptions(node.question.options || []);
   } else if (node.type === "condition" && node.condition) {
     data.conditionField = node.condition.field;
     data.conditionOperator = node.condition.operator;

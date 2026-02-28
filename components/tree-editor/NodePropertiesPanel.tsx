@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { answerToKey } from "@/lib/decision-tree/answer-utils";
 import { useTreeEditorStore } from "@/lib/tree-editor/store";
 
 export function NodePropertiesPanel() {
@@ -25,6 +26,14 @@ export function NodePropertiesPanel() {
 
   const { data } = node;
   const simple = viewMode === "simple";
+  const optionKeyCounts = new Map<string, number>();
+  if (data.nodeType === "question") {
+    for (const option of data.options || []) {
+      const key = answerToKey(option);
+      if (!key) continue;
+      optionKeyCounts.set(key, (optionKeyCounts.get(key) || 0) + 1);
+    }
+  }
 
   const inputClass = "border-[#262626] bg-[#111111] text-white placeholder:text-[#555] focus:border-[#444] focus:ring-0";
   const labelClass = "text-xs text-[#a1a1a1] uppercase tracking-wider";
@@ -121,19 +130,28 @@ export function NodePropertiesPanel() {
               </Label>
               <div className="space-y-2">
                 {(data.options || []).map((opt, idx) => {
-                  const isDuplicate = (data.options || []).indexOf(opt) !== idx && opt !== "";
+                  const optionKey = answerToKey(opt);
+                  const isDuplicate = optionKey !== "" && (optionKeyCounts.get(optionKey) || 0) > 1;
                   return (
                     <div key={idx}>
                       <div className="flex gap-2">
                         <Input
                           value={opt}
                           onChange={(e) => {
-                            const oldOpt = (data.options || [])[idx];
+                            const oldOpt = (data.options || [])[idx] || "";
+                            const nextValue = e.target.value;
+                            const nextKey = answerToKey(nextValue);
+                            const hasDuplicate = nextKey !== "" && (data.options || []).some(
+                              (option, optionIdx) =>
+                                optionIdx !== idx && answerToKey(option) === nextKey,
+                            );
+                            if (hasDuplicate) return;
+
                             const newOptions = [...(data.options || [])];
-                            newOptions[idx] = e.target.value;
+                            newOptions[idx] = nextValue;
                             updateNodeData(selectedNodeId, { options: newOptions });
-                            if (oldOpt && e.target.value && oldOpt !== e.target.value) {
-                              renameOption(selectedNodeId, oldOpt, e.target.value);
+                            if (oldOpt !== nextValue) {
+                              renameOption(selectedNodeId, oldOpt, nextValue);
                             }
                           }}
                           className={`${inputClass} flex-1 ${isDuplicate ? "!border-red-500/50" : ""}`}

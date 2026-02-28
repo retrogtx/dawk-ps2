@@ -2,6 +2,7 @@
 
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { HelpCircle, Crown } from "lucide-react";
+import { answerKeyToHandle, normalizeQuestionOptions } from "@/lib/decision-tree/answer-utils";
 import type { FlowNodeData } from "@/lib/tree-editor/transform";
 import { useTreeEditorStore } from "@/lib/tree-editor/store";
 
@@ -11,7 +12,7 @@ export function QuestionNode({ data, selected }: NodeProps<QuestionNodeType>) {
   const nodeData = data;
   const viewMode = useTreeEditorStore((s) => s.viewMode);
   const simple = viewMode === "simple";
-  const options = nodeData.options || [];
+  const options = normalizeQuestionOptions(nodeData.options || []);
 
   return (
     <div
@@ -54,19 +55,17 @@ export function QuestionNode({ data, selected }: NodeProps<QuestionNodeType>) {
 
       <div className="flex justify-around px-2 pb-2">
         {options.length > 0 ? (
-          options
-            .filter((o, i, arr) => o.trim() !== "" && arr.findIndex((v) => v.trim() === o.trim()) === i)
-            .map((opt) => (
-              <div key={`answer-${opt.trim()}`} className="flex flex-col items-center">
-                <span className="text-[10px] text-[#a1a1a1] mb-1">{opt.trim()}</span>
-                <Handle
-                  type="source"
-                  position={Position.Bottom}
-                  id={`answer-${opt.trim()}`}
-                  className="!relative !transform-none !w-2.5 !h-2.5 !bg-[#00d4aa] !border-[#0a0a0a] !border-2"
-                />
-              </div>
-            ))
+          options.map((opt, idx) => (
+            <div key={`${opt}-${idx}`} className="flex flex-col items-center">
+              <span className="text-[10px] text-[#a1a1a1] mb-1">{opt}</span>
+              <Handle
+                type="source"
+                position={Position.Bottom}
+                id={answerKeyToHandle(opt)}
+                className="!relative !transform-none !w-2.5 !h-2.5 !bg-[#00d4aa] !border-[#0a0a0a] !border-2"
+              />
+            </div>
+          ))
         ) : (
           <Handle
             type="source"

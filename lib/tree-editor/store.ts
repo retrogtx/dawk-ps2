@@ -9,6 +9,12 @@ import {
   applyEdgeChanges,
 } from "@xyflow/react";
 import type { FlowNodeData } from "./transform";
+import {
+  answerHandleToKey,
+  answerKeyToHandle,
+  answerToKey,
+  normalizeAnswerLabel,
+} from "@/lib/decision-tree/answer-utils";
 
 let nodeCounter = 0;
 
@@ -125,21 +131,26 @@ export const useTreeEditorStore = create<TreeEditorState>((set, get) => ({
 
     // Question nodes: label by answer, one target per sourceHandle
     if (sourceNode.data.nodeType === "question") {
-      const handleId = connection.sourceHandle || "";
-      const answerLabel = handleId.startsWith("answer-")
-        ? handleId.replace("answer-", "")
+      const answerKey = answerHandleToKey(connection.sourceHandle);
+      const options = sourceNode.data.options || [];
+      const answerLabel = answerKey
+        ? normalizeAnswerLabel(
+          options.find((option) => answerToKey(option) === answerKey) || answerKey,
+        )
         : `option-${edges.filter((e) => e.source === connection.source).length + 1}`;
+      const normalizedHandle = answerKey ? answerKeyToHandle(answerKey) : connection.sourceHandle;
 
       // Block if this sourceHandle already has a connection
       const handleTaken = edges.some(
-        (e) => e.source === connection.source && e.sourceHandle === connection.sourceHandle,
+        (e) => e.source === connection.source && e.sourceHandle === normalizedHandle,
       );
       if (handleTaken) return;
 
+      const edgeKey = answerKey || answerToKey(answerLabel) || "option";
       const newEdge: Edge = {
-        id: `${connection.source}-${answerLabel}-${connection.target}`,
+        id: `${connection.source}-${edgeKey}-${connection.target}`,
         source: connection.source!,
-        sourceHandle: connection.sourceHandle,
+        sourceHandle: normalizedHandle,
         target: connection.target!,
         type: "labeled",
         data: { label: answerLabel },
@@ -218,40 +229,54 @@ export const useTreeEditorStore = create<TreeEditorState>((set, get) => ({
 
   renameOption: (nodeId, oldOption, newOption) => {
     const { edges } = get();
-    const oldTrimmed = oldOption.trim();
-    const trimmed = newOption.trim();
+    const oldKey = answerToKey(oldOption);
+    if (!oldKey) return;
+
+    const trimmed = normalizeAnswerLabel(newOption);
     // If renamed to blank, remove the edge entirely
     if (!trimmed) {
       set({
         edges: edges.filter(
-          (e) => !(e.source === nodeId && e.sourceHandle === `answer-${oldTrimmed}`),
+          (e) => !(e.source === nodeId && answerHandleToKey(e.sourceHandle) === oldKey),
         ),
         isDirty: true,
       });
       return;
     }
-    if (oldTrimmed === trimmed) return;
-    // Re-key edges that reference the old option handle
+    const newKey = answerToKey(trimmed);
+
+    // Re-key edges that reference the old option handle.
     const updatedEdges = edges.map((e) => {
-      if (e.source === nodeId && e.sourceHandle === `answer-${oldTrimmed}`) {
+      if (e.source === nodeId && answerHandleToKey(e.sourceHandle) === oldKey) {
         return {
           ...e,
-          id: `${nodeId}-${trimmed}-${e.target}`,
-          sourceHandle: `answer-${trimmed}`,
-          data: { ...e.data, label: trimmed },
+          id: `${nodeId}-${newKey}-${e.target}`,
+          sourceHandle: answerKeyToHandle(newKey),
+          data: { ...(e.data as Record<string, unknown>), label: trimmed },
         };
       }
       return e;
     });
-    set({ edges: updatedEdges, isDirty: true });
+
+    // Keep only one outgoing edge per answer handle.
+    const dedupedEdges = updatedEdges.filter(
+      (edge, idx, arr) =>
+        arr.findIndex(
+          (candidate) =>
+            candidate.source === edge.source && candidate.sourceHandle === edge.sourceHandle,
+        ) === idx,
+    );
+
+    set({ edges: dedupedEdges, isDirty: true });
   },
 
   removeOptionEdge: (nodeId, option) => {
     const { edges } = get();
-    const trimmed = option.trim();
+    const optionKey = answerToKey(option);
+    if (!optionKey) return;
     set({
       edges: edges.filter(
-        (e) => !(e.source === nodeId && e.sourceHandle === `answer-${trimmed}`),
+        (e) => !(e.source === nodeId && answerHandleToKey(e.sourceHandle) === optionKey),
       ),
       isDirty: true,
     });

@@ -1,4 +1,5 @@
 import type { DecisionTreeData, DecisionNode } from "@/lib/db/schema";
+import { answerToKey } from "@/lib/decision-tree/answer-utils";
 
 export interface DecisionStep {
   nodeId: string;
@@ -37,15 +38,16 @@ export function executeDecisionTree(
     } else if (currentNode.type === "question") {
       const field = currentNode.question?.extractFrom;
       const answer = field ? extractedParams[field] : undefined;
+      const nextId = answer ? resolveQuestionChildId(currentNode, answer) : undefined;
 
-      if (answer && currentNode.childrenByAnswer?.[answer]) {
+      if (answer && nextId) {
         path.push({
           nodeId: currentNode.id,
           label: currentNode.label,
           type: "question",
           answer,
         });
-        currentNode = tree.nodes[currentNode.childrenByAnswer[answer]];
+        currentNode = tree.nodes[nextId];
       } else {
         // Can't resolve — record and stop
         path.push({
@@ -74,6 +76,35 @@ export function executeDecisionTree(
     path,
     recommendation: lastAction?.action,
   };
+}
+
+function resolveQuestionChildId(
+  node: DecisionNode,
+  answer: string,
+): string | undefined {
+  const childrenByAnswer = node.childrenByAnswer;
+  if (!childrenByAnswer) return undefined;
+
+  // Fast path for trees that store raw answer keys.
+  if (childrenByAnswer[answer]) {
+    return childrenByAnswer[answer];
+  }
+
+  const normalizedAnswer = answerToKey(answer);
+  if (!normalizedAnswer) return undefined;
+
+  if (childrenByAnswer[normalizedAnswer]) {
+    return childrenByAnswer[normalizedAnswer];
+  }
+
+  // Backward compatibility with mixed or legacy key formatting.
+  for (const [storedAnswer, childId] of Object.entries(childrenByAnswer)) {
+    if (answerToKey(storedAnswer) === normalizedAnswer) {
+      return childId;
+    }
+  }
+
+  return undefined;
 }
 
 function evaluateCondition(
