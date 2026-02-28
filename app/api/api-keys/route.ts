@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { apiKeys } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { generateApiKey } from "@/lib/utils/api-key";
 
 export async function GET() {
@@ -61,12 +61,17 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Missing key ID" }, { status: 400 });
     }
 
-    await db
+    const deleted = await db
       .delete(apiKeys)
-      .where(eq(apiKeys.id, keyId));
+      .where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, user.id)))
+      .returning({ id: apiKeys.id });
+
+    if (deleted.length === 0) {
+      return NextResponse.json({ error: "API key not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Failed to delete API key" }, { status: 500 });
   }
 }
