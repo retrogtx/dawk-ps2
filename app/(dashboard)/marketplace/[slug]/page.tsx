@@ -56,11 +56,11 @@ export default async function MarketplacePluginPage({
     <main className="min-h-screen bg-[#0a0a0a] px-4 py-12">
       <div className="mx-auto w-full max-w-4xl">
         <Link
-          href="/"
+          href="/marketplace"
           className="mb-6 inline-flex items-center text-sm text-[#666] transition-colors hover:text-white"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to Home
+          Back to Marketplace
         </Link>
 
         <MarketplaceActions
