@@ -142,7 +142,7 @@ export async function runQueryPipeline(
   const citationResult = processCitations(text, sources);
 
   // 7. Hallucination guard
-  const guardedResult = applyHallucinationGuard(citationResult);
+  const guardedResult = applyHallucinationGuard(citationResult, sources.length);
 
   const citedIndices = new Set(citationResult.usedSourceIndices);
   const sourcesPanel: SourceCard[] = sources.map((source, i) => ({
@@ -328,7 +328,7 @@ export async function streamQueryPipeline(
         }
 
         const citationResult = processCitations(fullText, sources);
-        const guardedResult = applyHallucinationGuard(citationResult);
+        const guardedResult = applyHallucinationGuard(citationResult, sources.length);
 
         const citedIndices = new Set(citationResult.usedSourceIndices);
         const sourcesPanel: SourceCard[] = sources.map((source, i) => ({

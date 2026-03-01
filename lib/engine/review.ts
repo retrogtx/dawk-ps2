@@ -234,7 +234,7 @@ export async function runReviewPipeline(
 
       const citationText = (raw.citations || []).join(" ") + " " + raw.issue;
       const citationResult = processCitations(citationText, sources);
-      const guardedResult = applyHallucinationGuard(citationResult);
+      const guardedResult = applyHallucinationGuard(citationResult, sources.length);
 
       batchAnnotations.push({
         id: `ann_${annotationCounter++}`,
@@ -394,7 +394,7 @@ export async function streamReviewPipeline(
 
               const citationText = (raw.citations || []).join(" ") + " " + raw.issue;
               const citationResult = processCitations(citationText, sources);
-              const guardedResult = applyHallucinationGuard(citationResult);
+              const guardedResult = applyHallucinationGuard(citationResult, sources.length);
 
               const annotation: ReviewAnnotation = {
                 id: `ann_${annotationCounter++}`,

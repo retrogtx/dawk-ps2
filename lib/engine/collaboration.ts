@@ -113,12 +113,7 @@ RULES:
 
   const citationResult = processCitations(text, expert.sources);
 
-  // In collaboration, experts with no knowledge base should still contribute
-  // from their persona + web search. Only apply the hallucination guard when
-  // the expert actually had sources to cite.
-  const guardedResult = expert.sources.length > 0
-    ? applyHallucinationGuard(citationResult)
-    : citationResult;
+  const guardedResult = applyHallucinationGuard(citationResult, expert.sources.length);
 
   const finalAnswer = guardedResult.cleanedAnswer;
   const finalCitations = guardedResult.citations;
