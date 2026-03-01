@@ -72,8 +72,10 @@ export function AnalyticsDashboard({
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    const frame = window.requestAnimationFrame(() => {
+      setLoading(true);
+      setError(null);
+    });
     fetch(`/api/analytics?range=${range}&pluginId=${pluginId}`, {
       signal: controller.signal,
     })
@@ -95,6 +97,7 @@ export function AnalyticsDashboard({
         if (!cancelled) setLoading(false);
       });
     return () => {
+      window.cancelAnimationFrame(frame);
       cancelled = true;
       controller.abort();
     };
